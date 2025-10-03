@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>北京二环马拉松路线规划 - 从西直门出发</title>
     <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -355,6 +360,105 @@
         .route-direction strong {
             color: #28a745;
         }
+        
+        /* 多人位置共享样式 */
+        .share-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .share-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .nickname-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+        .nickname-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .share-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .share-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .share-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .online-users {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .online-users h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: white;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .user-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .user-name {
+            flex: 1;
+            font-weight: bold;
+            color: #333;
+        }
+        .user-distance {
+            color: #666;
+            font-size: 12px;
+        }
+        .firebase-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .firebase-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .firebase-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -664,6 +768,20 @@
 
         <div class="info-panel">
             <h2>🗺️ 路线地图（带公厕标记）</h2>
+            
+            <!-- 多人位置共享面板 -->
+            <div class="share-panel">
+                <div class="share-controls">
+                    <input type="text" id="nicknameInput" class="nickname-input" placeholder="输入你的昵称（如：小明）" maxlength="20" />
+                    <button id="shareBtn" class="share-btn">🌐 开始共享位置</button>
+                </div>
+                <div id="firebaseStatus" class="firebase-status">⏳ 正在连接服务器...</div>
+                <div id="onlineUsers" class="online-users" style="display: none;">
+                    <h4>📍 在线用户 (<span id="userCount">0</span>)</h4>
+                    <div id="userList"></div>
+                </div>
+            </div>
+            
             <div class="map-search-container">
                 <input type="text" id="searchInput" class="map-search-input" placeholder="搜索地点（如：天安门、北京大学、三里屯等）" />
                 <button id="searchBtn" class="map-search-btn">🔍 搜索</button>
@@ -698,6 +816,37 @@
     </div>
 
     <script>
+        // ========== Firebase 配置和初始化 ==========
+        const firebaseConfig = {
+          apiKey: "YOUR_API_KEY",
+          authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+          databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+          projectId: "YOUR_PROJECT_ID",
+          storageBucket: "YOUR_PROJECT_ID.appspot.com",
+          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+          appId: "YOUR_APP_ID"
+        };
+
+        // 初始化 Firebase
+        let firebaseApp = null;
+        let database = null;
+        let isFirebaseEnabled = false;
+        
+        try {
+            // 检查配置是否已更新
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                isFirebaseEnabled = true;
+                console.log("✅ Firebase 初始化成功");
+            } else {
+                console.warn("⚠️ Firebase 配置未设置，多人共享功能将被禁用");
+            }
+        } catch (error) {
+            console.error("❌ Firebase 初始化失败:", error);
+            isFirebaseEnabled = false;
+        }
+
         // 初始化地图
         var map = new BMap.Map("map");
         var point = new BMap.Point(116.349, 39.943); // 西直门坐标
@@ -1005,6 +1154,295 @@
             }
         });
 
+        // ========== 多人位置共享功能 ==========
+        var isSharing = false; // 是否正在共享位置
+        var myUserId = null; // 当前用户ID
+        var myNickname = null; // 当前用户昵称
+        var otherUsersMarkers = {}; // 其他用户的标记 {userId: {marker, circle, label}}
+        var userColors = {}; // 用户颜色映射
+        var availableColors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+        ];
+        var colorIndex = 0;
+
+        // 生成唯一用户ID
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 获取用户颜色
+        function getUserColor(userId) {
+            if (!userColors[userId]) {
+                userColors[userId] = availableColors[colorIndex % availableColors.length];
+                colorIndex++;
+            }
+            return userColors[userId];
+        }
+
+        // 创建其他用户的定位图标
+        function createOtherUserIcon(color, heading) {
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3Cpath d='M 18 6 L 22 14 L 18 12 L 14 14 Z' fill='white' transform='rotate(" + heading + " 18 18)'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            } else {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            }
+        }
+
+        // 更新在线用户列表
+        function updateOnlineUsersList(users) {
+            var userList = document.getElementById('userList');
+            var userCount = document.getElementById('userCount');
+            var onlineUsersDiv = document.getElementById('onlineUsers');
+            
+            var count = 0;
+            var html = '';
+            
+            for (var userId in users) {
+                if (userId === myUserId) continue; // 跳过自己
+                
+                var user = users[userId];
+                var color = getUserColor(userId);
+                count++;
+                
+                // 计算距离
+                var distance = '';
+                if (lastPosition && user.lat && user.lng) {
+                    var userPoint = new BMap.Point(user.lng, user.lat);
+                    var myPoint = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                    var dist = map.getDistance(userPoint, myPoint);
+                    if (dist < 1000) {
+                        distance = Math.round(dist) + 'm';
+                    } else {
+                        distance = (dist / 1000).toFixed(1) + 'km';
+                    }
+                }
+                
+                html += '<div class="user-item">' +
+                    '<div class="user-color" style="background: ' + color + ';"></div>' +
+                    '<div class="user-name">' + (user.nickname || '匿名用户') + '</div>' +
+                    (distance ? '<div class="user-distance">' + distance + '</div>' : '') +
+                    '</div>';
+            }
+            
+            userCount.textContent = count;
+            userList.innerHTML = html || '<div style="text-align:center;color:#999;padding:10px;">暂无其他用户在线</div>';
+            onlineUsersDiv.style.display = isSharing ? 'block' : 'none';
+        }
+
+        // 更新其他用户的地图标记
+        function updateOtherUserMarker(userId, userData) {
+            if (userId === myUserId) return; // 不显示自己
+            
+            var point = new BMap.Point(userData.lng, userData.lat);
+            var color = getUserColor(userId);
+            
+            // 移除旧标记
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                if (otherUsersMarkers[userId].label) {
+                    map.removeOverlay(otherUsersMarkers[userId].label);
+                }
+            }
+            
+            // 创建新标记
+            var icon = createOtherUserIcon(color, userData.heading);
+            var marker = new BMap.Marker(point, {icon: icon});
+            
+            // 创建精度圈
+            var circle = new BMap.Circle(point, userData.accuracy || 50, {
+                strokeColor: color,
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                fillColor: color,
+                fillOpacity: 0.1
+            });
+            
+            // 创建标签
+            var label = new BMap.Label(userData.nickname || '匿名', {
+                offset: new BMap.Size(0, -40)
+            });
+            label.setStyle({
+                color: color,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                border: 'none',
+                backgroundColor: 'white',
+                padding: '3px 8px',
+                borderRadius: '3px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+            });
+            
+            marker.setLabel(label);
+            
+            // 添加信息窗口
+            var speedKmh = userData.speed ? (userData.speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:" + color + ";'>👤 " + (userData.nickname || '匿名用户') + "</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (userData.heading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(userData.heading) + "°</p>" : "") +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#999;'>更新：" + new Date(userData.timestamp).toLocaleTimeString() + "</p>" +
+                "</div>",
+                {width: 200}
+            );
+            
+            marker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            map.addOverlay(marker);
+            map.addOverlay(circle);
+            
+            otherUsersMarkers[userId] = {marker: marker, circle: circle, label: label};
+        }
+
+        // 移除用户标记
+        function removeUserMarker(userId) {
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                delete otherUsersMarkers[userId];
+            }
+        }
+
+        // 开始共享位置
+        function startSharing() {
+            if (!isFirebaseEnabled) {
+                alert('❌ Firebase 未配置，无法使用多人共享功能。\n\n请按照 FIREBASE_SETUP.md 中的说明配置 Firebase。');
+                return;
+            }
+            
+            var nickname = document.getElementById('nicknameInput').value.trim();
+            if (!nickname) {
+                alert('请输入你的昵称');
+                document.getElementById('nicknameInput').focus();
+                return;
+            }
+            
+            myUserId = generateUserId();
+            myNickname = nickname;
+            isSharing = true;
+            
+            // 更新按钮状态
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🔴 停止共享';
+            shareBtn.classList.add('active');
+            document.getElementById('nicknameInput').disabled = true;
+            
+            // 监听其他用户
+            database.ref('users').on('value', function(snapshot) {
+                var users = snapshot.val() || {};
+                updateOnlineUsersList(users);
+                
+                // 更新地图标记
+                for (var userId in users) {
+                    updateOtherUserMarker(userId, users[userId]);
+                }
+                
+                // 移除已离线用户的标记
+                for (var userId in otherUsersMarkers) {
+                    if (!users[userId]) {
+                        removeUserMarker(userId);
+                    }
+                }
+            });
+            
+            // 监听用户离线
+            database.ref('users/' + myUserId).onDisconnect().remove();
+            
+            // 开始定位
+            if (!isTracking) {
+                document.getElementById('locationBtn').click();
+            }
+        }
+
+        // 停止共享位置
+        function stopSharing() {
+            if (!isFirebaseEnabled || !myUserId) return;
+            
+            isSharing = false;
+            
+            // 从数据库移除自己
+            database.ref('users/' + myUserId).remove();
+            database.ref('users').off();
+            
+            // 清除所有其他用户标记
+            for (var userId in otherUsersMarkers) {
+                removeUserMarker(userId);
+            }
+            otherUsersMarkers = {};
+            
+            // 更新按钮状态
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🌐 开始共享位置';
+            shareBtn.classList.remove('active');
+            document.getElementById('nicknameInput').disabled = false;
+            document.getElementById('onlineUsers').style.display = 'none';
+            
+            myUserId = null;
+            myNickname = null;
+        }
+
+        // 更新自己的位置到 Firebase
+        function updateMyLocationToFirebase(lat, lng, accuracy, speed, heading) {
+            if (!isSharing || !myUserId || !isFirebaseEnabled) return;
+            
+            database.ref('users/' + myUserId).set({
+                nickname: myNickname,
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy,
+                speed: speed || 0,
+                heading: heading || 0,
+                timestamp: Date.now()
+            });
+        }
+
+        // Firebase 连接状态监听
+        if (isFirebaseEnabled) {
+            database.ref('.info/connected').on('value', function(snapshot) {
+                var statusDiv = document.getElementById('firebaseStatus');
+                if (snapshot.val() === true) {
+                    statusDiv.textContent = '✅ 服务器已连接';
+                    statusDiv.className = 'firebase-status connected';
+                } else {
+                    statusDiv.textContent = '❌ 服务器连接断开';
+                    statusDiv.className = 'firebase-status error';
+                }
+            });
+        } else {
+            var statusDiv = document.getElementById('firebaseStatus');
+            statusDiv.textContent = '⚠️ Firebase 未配置，请查看 FIREBASE_SETUP.md';
+            statusDiv.className = 'firebase-status error';
+        }
+
+        // 共享按钮点击事件
+        document.getElementById('shareBtn').addEventListener('click', function() {
+            if (isSharing) {
+                stopSharing();
+            } else {
+                startSharing();
+            }
+        });
+
         // ========== 实时定位功能 ==========
         var locationMarker = null; // 当前位置标记
         var locationCircle = null; // 位置精度圈
@@ -1167,6 +1605,9 @@
 
             // 更新信息显示
             updateLocationInfo(position, accuracy, routeInfo, speed, currentHeading);
+
+            // 同步位置到 Firebase（如果正在共享）
+            updateMyLocationToFirebase(lat, lng, accuracy, speed, currentHeading);
 
             // 移动时地图跟随（平滑移动）
             if (isTracking) {
