@@ -140,6 +140,75 @@
             height: 700px;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .map-search-container {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .map-search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .map-search-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .map-search-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .map-search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .map-search-btn:active {
+            transform: translateY(0);
+        }
+        .search-result-panel {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .search-result-address {
+            font-size: 12px;
+            color: #666;
         }
         .legend {
             background: white;
@@ -551,6 +620,11 @@
 
         <div class="info-panel">
             <h2>🗺️ 路线地图（带公厕标记）</h2>
+            <div class="map-search-container">
+                <input type="text" id="searchInput" class="map-search-input" placeholder="搜索地点（如：天安门、北京大学、三里屯等）" />
+                <button id="searchBtn" class="map-search-btn">🔍 搜索</button>
+            </div>
+            <div id="searchResults" class="search-result-panel"></div>
             <div id="map"></div>
             <div class="legend">
                 <div class="legend-item">
@@ -775,6 +849,115 @@
         // 添加缩放控件
         var navigationControl = new BMap.NavigationControl({anchor: BMAP_ANCHOR_TOP_RIGHT});
         map.addControl(navigationControl);
+
+        // ========== 地点搜索功能 ==========
+        var searchMarker = null; // 保存搜索结果的标记
+        var localSearch = new BMap.LocalSearch(map, {
+            onSearchComplete: function(results) {
+                var resultsPanel = document.getElementById('searchResults');
+                resultsPanel.innerHTML = '';
+                
+                if (localSearch.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var resultsHtml = '';
+                    var resultsCount = Math.min(results.getCurrentNumPois(), 5); // 最多显示5个结果
+                    
+                    for (var i = 0; i < resultsCount; i++) {
+                        var poi = results.getPoi(i);
+                        resultsHtml += '<div class="search-result-item" data-index="' + i + '">' +
+                            '<div class="search-result-title">' + poi.title + '</div>' +
+                            '<div class="search-result-address">' + poi.address + '</div>' +
+                            '</div>';
+                    }
+                    
+                    resultsPanel.innerHTML = resultsHtml;
+                    resultsPanel.style.display = 'block';
+                    
+                    // 为每个搜索结果添加点击事件
+                    var resultItems = resultsPanel.getElementsByClassName('search-result-item');
+                    for (var i = 0; i < resultItems.length; i++) {
+                        resultItems[i].addEventListener('click', function() {
+                            var index = parseInt(this.getAttribute('data-index'));
+                            var poi = results.getPoi(index);
+                            showSearchResult(poi);
+                            resultsPanel.style.display = 'none';
+                        });
+                    }
+                } else {
+                    resultsPanel.innerHTML = '<div class="search-result-item">未找到相关地点，请尝试其他关键词</div>';
+                    resultsPanel.style.display = 'block';
+                }
+            }
+        });
+
+        // 显示搜索结果
+        function showSearchResult(poi) {
+            // 移除之前的搜索标记
+            if (searchMarker) {
+                map.removeOverlay(searchMarker);
+            }
+            
+            // 创建新的搜索标记
+            var point = poi.point;
+            var icon = new BMap.Icon(
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%2300bcd4'/%3E%3Ccircle cx='16' cy='16' r='8' fill='white'/%3E%3C/svg%3E",
+                new BMap.Size(32, 42)
+            );
+            
+            searchMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(searchMarker);
+            
+            // 创建信息窗口
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#00bcd4;font-size:16px;'>" + poi.title + "</h4>" +
+                "<p style='margin:0 0 8px 0;color:#666;font-size:14px;'><strong>地址：</strong>" + poi.address + "</p>" +
+                (poi.phoneNumber ? "<p style='margin:0;color:#666;font-size:14px;'><strong>电话：</strong>" + poi.phoneNumber + "</p>" : "") +
+                "</div>",
+                {width: 320}
+            );
+            
+            searchMarker.openInfoWindow(infoWindow);
+            
+            // 移动地图中心到搜索结果，并调整缩放级别
+            map.centerAndZoom(point, 15);
+            
+            // 添加动画效果
+            searchMarker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                searchMarker.setAnimation(null);
+            }, 2000);
+        }
+
+        // 搜索按钮点击事件
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            var keyword = document.getElementById('searchInput').value.trim();
+            if (keyword) {
+                localSearch.search(keyword);
+            } else {
+                alert('请输入搜索关键词');
+            }
+        });
+
+        // 搜索框回车事件
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('searchBtn').click();
+            }
+        });
+
+        // 点击地图其他地方隐藏搜索结果面板
+        map.addEventListener('click', function() {
+            document.getElementById('searchResults').style.display = 'none';
+        });
+
+        // 点击搜索结果面板外部隐藏面板
+        document.addEventListener('click', function(e) {
+            var resultsPanel = document.getElementById('searchResults');
+            var searchContainer = document.querySelector('.map-search-container');
+            if (!resultsPanel.contains(e.target) && !searchContainer.contains(e.target)) {
+                resultsPanel.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
