@@ -1,14 +1,15 @@
 // Firebase 配置文件
-// 请按照 FIREBASE_SETUP.md 中的说明获取你的配置信息并替换下面的值
+// 已配置完成 - beijing-marathon-tracker
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCVCpHY0yIj617UugtaN1iIGncoy9Ks3LI",
+  authDomain: "beijing-marathon-tracker.firebaseapp.com",
+  databaseURL: "https://beijing-marathon-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "beijing-marathon-tracker",
+  storageBucket: "beijing-marathon-tracker.firebasestorage.app",
+  messagingSenderId: "245823130801",
+  appId: "1:245823130801:web:d661ada76dc1e831afe690",
+  measurementId: "G-XL6V9Z467E"
 };
 
 // 导出配置（如果使用模块化）
