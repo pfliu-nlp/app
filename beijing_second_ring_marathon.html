@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北京二环马拉松路线规划 - 从西直门出发</title>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .info-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .info-panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #667eea;
+            padding-left: 10px;
+        }
+        .route-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .info-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-card p {
+            font-size: 20px;
+            color: #333;
+            font-weight: bold;
+        }
+        .checkpoints {
+            margin-top: 15px;
+        }
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .checkpoint-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .checkpoint-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .checkpoint-name {
+            font-weight: bold;
+            color: #333;
+            margin-right: 10px;
+        }
+        .checkpoint-distance {
+            color: #666;
+            font-size: 14px;
+            margin-left: auto;
+        }
+        .toilet-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #fff3cd;
+            border-radius: 6px;
+            border-left: 3px solid #ffc107;
+        }
+        .toilet-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+        .toilet-info {
+            flex: 1;
+        }
+        .toilet-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .toilet-address {
+            color: #666;
+            font-size: 13px;
+        }
+        #map {
+            width: 100%;
+            height: 700px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .tips {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .tips h3 {
+            color: #0c5460;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .tips ul {
+            margin-left: 20px;
+            color: #0c5460;
+        }
+        .tips li {
+            margin-bottom: 5px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ff6b6b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .warning-box h3 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .warning-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #ff6b6b;
+        }
+        .warning-item h4 {
+            color: #ff6b6b;
+            margin-bottom: 6px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .warning-number {
+            background: #ff6b6b;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+        .warning-item p {
+            color: #666;
+            font-size: 13px;
+            margin: 0;
+            line-height: 1.6;
+        }
+        .route-direction {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .route-direction h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .route-direction p {
+            color: #155724;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        .route-direction strong {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃 北京二环马拉松路线规划</h1>
+        <p>起点：西直门 | 全程约32-33公里 | 途经15个"门"</p>
+    </div>
+
+    <div class="container">
+        <div class="info-panel">
+            <div class="route-direction">
+                <h3>🧭 重要：跑内环（顺时针方向）</h3>
+                <p><strong>必须跑内环！</strong>顺时针方向与行车方向一致，更安全，减少逆行风险。</p>
+                <p><strong>南半部分（长安街以南）：</strong>有护城河全程伴随，河堤建有塑胶绿道，<span style="color:#ff6b6b;font-weight:bold;">一定要从马路下到河堤绿道上跑</span>。绿树成荫，河景优美。</p>
+                <p><strong>北半部分（长安街以北）：</strong>全是大马路，需过多个红绿灯。建议早晨跑避开车流人流。</p>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>📊 路线概况</h2>
+            <div class="route-info">
+                <div class="info-card">
+                    <h3>总距离</h3>
+                    <p>32.66 km</p>
+                </div>
+                <div class="info-card">
+                    <h3>起点</h3>
+                    <p>西直门</p>
+                </div>
+                <div class="info-card">
+                    <h3>建议配速</h3>
+                    <p>5:00-5:30/km</p>
+                </div>
+                <div class="info-card">
+                    <h3>预计用时</h3>
+                    <p>2.5-3小时</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🚩 关键节点（顺时针方向）</h2>
+            <div class="checkpoints">
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">起</div>
+                    <div class="checkpoint-name">西直门</div>
+                    <div class="checkpoint-distance">0 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">1</div>
+                    <div class="checkpoint-name">德胜门</div>
+                    <div class="checkpoint-distance">~2.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">2</div>
+                    <div class="checkpoint-name">安定门</div>
+                    <div class="checkpoint-distance">~5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">3</div>
+                    <div class="checkpoint-name">东直门</div>
+                    <div class="checkpoint-distance">~7.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">4</div>
+                    <div class="checkpoint-name">朝阳门</div>
+                    <div class="checkpoint-distance">~10 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">5</div>
+                    <div class="checkpoint-name">建国门</div>
+                    <div class="checkpoint-distance">~12.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">6</div>
+                    <div class="checkpoint-name">东便门</div>
+                    <div class="checkpoint-distance">~15 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">7</div>
+                    <div class="checkpoint-name">广渠门</div>
+                    <div class="checkpoint-distance">~17 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">8</div>
+                    <div class="checkpoint-name">左安门</div>
+                    <div class="checkpoint-distance">~19 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">9</div>
+                    <div class="checkpoint-name">永定门</div>
+                    <div class="checkpoint-distance">~21 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">10</div>
+                    <div class="checkpoint-name">右安门</div>
+                    <div class="checkpoint-distance">~23 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">11</div>
+                    <div class="checkpoint-name">广安门</div>
+                    <div class="checkpoint-distance">~25 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">12</div>
+                    <div class="checkpoint-name">西便门</div>
+                    <div class="checkpoint-distance">~27 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">13</div>
+                    <div class="checkpoint-name">复兴门</div>
+                    <div class="checkpoint-distance">~29 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">14</div>
+                    <div class="checkpoint-name">阜成门</div>
+                    <div class="checkpoint-distance">~31 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">终</div>
+                    <div class="checkpoint-name">返回西直门</div>
+                    <div class="checkpoint-distance">~32.66 km</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>⚠️ 五个易错关键点（必看！）</h2>
+            <div class="warning-box">
+                <h3>根据跑友实战经验，以下5个位置最容易跑错，请特别注意！</h3>
+                
+                <div class="warning-item">
+                    <h4><span class="warning-number">①</span>东便门桥</h4>
+                    <p><strong>位置：</strong>东二环与长安街交叉口（约15km处）</p>
+                    <p><strong>正确做法：</strong>过东便门桥后，<span style="color:#ff6b6b;font-weight:bold;">先往西走约20米，从桥下穿到路对面，然后折返往东</span>继续跑。不要直接沿着二环继续！</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">②</span>广渠门桥</h4>
+                    <p><strong>位置：</strong>东南二环（约17km处）</p>
+                    <p><strong>正确做法：</strong>过广渠门桥之后，<span style="color:#ff6b6b;font-weight:bold;">要尽早下到护城河河堤的绿道</span>。路边有很多下行台阶，注意观察并及时下到河堤绿道上。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">③</span>天宁寺桥（西二环）</h4>
+                    <p><strong>位置：</strong>西二环南段（约27km处）</p>
+                    <p><strong>正确做法：</strong>转入西二环后，绿道到天宁寺桥就结束了。<span style="color:#ff6b6b;font-weight:bold;">在绿道上完全越过天宁寺桥，遇到的第一个上行台阶上到马路，然后右转向南跑约30米</span>，回到西二环辅路。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">④</span>天宁寺桥后（切换到内环）</h4>
+                    <p><strong>位置：</strong>过天宁寺桥后的路段</p>
+                    <p><strong>正确做法：</strong>过了天宁寺桥后，你在二环的外环上，<span style="color:#ff6b6b;font-weight:bold;">要尽快在前方路口穿到内环</span>，才能在前方的复兴门顺利穿过长安街。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">⑤</span>复兴门</h4>
+                    <p><strong>位置：</strong>西二环与长安街交叉口（约29km处）</p>
+                    <p><strong>正确做法：</strong>过复兴门时，<span style="color:#ff6b6b;font-weight:bold;">走桥下的自行车道</span>，不要上桥。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🚻 沿途公厕位置（重点标注）</h2>
+            <div class="checkpoints">
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">1. 西直门桥区公厕</div>
+                        <div class="toilet-address">西直门桥东北角，西直门外大街与北二环交叉口附近</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">2. 德胜门箭楼公厕</div>
+                        <div class="toilet-address">德胜门箭楼西侧，德胜门外大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">3. 安定门地铁站公厕</div>
+                        <div class="toilet-address">安定门地铁站A口附近，安定门外大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">4. 东直门桥区公厕</div>
+                        <div class="toilet-address">东直门桥西南角，东直门外大街与东二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">5. 朝阳门地铁站公厕</div>
+                        <div class="toilet-address">朝阳门地铁站C口附近，朝阳门内大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">6. 建国门桥区公厕</div>
+                        <div class="toilet-address">建国门桥东北角，建国门外大街与东二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">7. 明城墙遗址公园公厕</div>
+                        <div class="toilet-address">东便门附近，明城墙遗址公园内（东二环与崇文门东大街交叉口）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">8. 龙潭湖公园公厕</div>
+                        <div class="toilet-address">广渠门附近，龙潭湖公园北门（左安门内大街）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">9. 永定门公园公厕</div>
+                        <div class="toilet-address">永定门城楼附近，永定门公园内</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">10. 陶然亭公园公厕</div>
+                        <div class="toilet-address">右安门附近，陶然亭公园北门（太平街）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">11. 广安门桥区公厕</div>
+                        <div class="toilet-address">广安门桥西北角，广安门外大街与南二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">12. 复兴门地铁站公厕</div>
+                        <div class="toilet-address">复兴门地铁站B口附近，复兴门内大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">13. 阜成门地铁站公厕</div>
+                        <div class="toilet-address">阜成门地铁站A口附近，阜成门内大街</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips">
+                <h3>💡 跑步建议</h3>
+                <ul>
+                    <li><strong>出发时间：</strong>建议早上5:30-6:00出发，避开车流高峰（北半部分红绿灯多），天气凉爽</li>
+                    <li><strong>补给准备：</strong>携带能量胶2-3支、盐丸，建议在12km和24km处补充</li>
+                    <li><strong>路线选择：</strong>南半部分（长安街以南）尽量跑河堤绿道，北半部分跑二环辅路</li>
+                    <li><strong>配速建议：</strong>前半程控制在5:15-5:30/km，后半程根据体力调整</li>
+                    <li><strong>安全提示：</strong>注意交通信号灯，部分路段需过马路，优先安全</li>
+                    <li><strong>公厕间隔：</strong>平均每2-3公里有一处公厕，合理安排补给和休息</li>
+                    <li><strong>天气关注：</strong>10月初北京天气宜人，但需注意防晒和补水</li>
+                    <li><strong>导航工具：</strong>建议使用跑步APP（如咕咚、悦跑圈）导航，避免在易错点迷路</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🗺️ 路线地图（带公厕标记）</h2>
+            <div id="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #667eea;"></div>
+                    <span>跑步路线</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #28a745;"></div>
+                    <span>起点/终点（西直门）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #ffc107;"></div>
+                    <span>公厕位置</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #dc3545;"></div>
+                    <span>关键节点</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #ff6b6b;"></div>
+                    <span>⚠️ 易错点（特别注意）</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化地图
+        var map = new BMap.Map("map");
+        var point = new BMap.Point(116.349, 39.943); // 西直门坐标
+        map.centerAndZoom(point, 12);
+        map.enableScrollWheelZoom(true);
+
+        // 二环路线关键点坐标（顺时针）
+        var routePoints = [
+            {name: "西直门", lat: 39.943, lng: 116.349, type: "start"},
+            {name: "德胜门", lat: 39.948, lng: 116.374, type: "checkpoint"},
+            {name: "安定门", lat: 39.948, lng: 116.407, type: "checkpoint"},
+            {name: "东直门", lat: 39.938, lng: 116.434, type: "checkpoint"},
+            {name: "朝阳门", lat: 39.927, lng: 116.434, type: "checkpoint"},
+            {name: "建国门", lat: 39.908, lng: 116.434, type: "checkpoint"},
+            {name: "东便门", lat: 39.895, lng: 116.434, type: "checkpoint"},
+            {name: "广渠门", lat: 39.883, lng: 116.434, type: "checkpoint"},
+            {name: "左安门", lat: 39.870, lng: 116.434, type: "checkpoint"},
+            {name: "永定门", lat: 39.863, lng: 116.395, type: "checkpoint"},
+            {name: "右安门", lat: 39.863, lng: 116.356, type: "checkpoint"},
+            {name: "广安门", lat: 39.883, lng: 116.330, type: "checkpoint"},
+            {name: "西便门", lat: 39.895, lng: 116.330, type: "checkpoint"},
+            {name: "复兴门", lat: 39.908, lng: 116.330, type: "checkpoint"},
+            {name: "阜成门", lat: 39.927, lng: 116.330, type: "checkpoint"},
+            {name: "西直门", lat: 39.943, lng: 116.349, type: "end"}
+        ];
+
+        // 易错关键点位置
+        var warningPoints = [
+            {
+                name: "①东便门桥", 
+                lat: 39.895, 
+                lng: 116.434, 
+                warning: "过桥后先往西走20米，从桥下穿到路对面，然后折返往东！"
+            },
+            {
+                name: "②广渠门桥", 
+                lat: 39.883, 
+                lng: 116.434, 
+                warning: "过桥后要尽早下到护城河河堤的绿道，路边有很多下行台阶！"
+            },
+            {
+                name: "③天宁寺桥", 
+                lat: 39.895, 
+                lng: 116.330, 
+                warning: "绿道在此结束！完全越过桥后，第一个上行台阶上马路，右转向南跑30米回到辅路！"
+            },
+            {
+                name: "④天宁寺桥后", 
+                lat: 39.900, 
+                lng: 116.330, 
+                warning: "此时在外环，要尽快在前方路口穿到内环，才能在复兴门穿过长安街！"
+            },
+            {
+                name: "⑤复兴门", 
+                lat: 39.908, 
+                lng: 116.330, 
+                warning: "走桥下的自行车道，不要上桥！"
+            }
+        ];
+
+        // 公厕位置
+        var toilets = [
+            {name: "西直门桥区公厕", lat: 39.943, lng: 116.350, address: "西直门桥东北角"},
+            {name: "德胜门箭楼公厕", lat: 39.948, lng: 116.373, address: "德胜门箭楼西侧"},
+            {name: "安定门地铁站公厕", lat: 39.948, lng: 116.408, address: "安定门地铁站A口附近"},
+            {name: "东直门桥区公厕", lat: 39.938, lng: 116.433, address: "东直门桥西南角"},
+            {name: "朝阳门地铁站公厕", lat: 39.927, lng: 116.433, address: "朝阳门地铁站C口附近"},
+            {name: "建国门桥区公厕", lat: 39.908, lng: 116.435, address: "建国门桥东北角"},
+            {name: "明城墙遗址公园公厕", lat: 39.895, lng: 116.433, address: "明城墙遗址公园内"},
+            {name: "龙潭湖公园公厕", lat: 39.883, lng: 116.433, address: "龙潭湖公园北门"},
+            {name: "永定门公园公厕", lat: 39.863, lng: 116.395, address: "永定门公园内"},
+            {name: "陶然亭公园公厕", lat: 39.863, lng: 116.357, address: "陶然亭公园北门"},
+            {name: "广安门桥区公厕", lat: 39.883, lng: 116.331, address: "广安门桥西北角"},
+            {name: "复兴门地铁站公厕", lat: 39.908, lng: 116.331, address: "复兴门地铁站B口附近"},
+            {name: "阜成门地铁站公厕", lat: 39.927, lng: 116.331, address: "阜成门地铁站A口附近"}
+        ];
+
+        // 绘制路线
+        var polylinePoints = [];
+        routePoints.forEach(function(point) {
+            polylinePoints.push(new BMap.Point(point.lng, point.lat));
+        });
+
+        var polyline = new BMap.Polyline(polylinePoints, {
+            strokeColor: "#667eea",
+            strokeWeight: 4,
+            strokeOpacity: 0.8
+        });
+        map.addOverlay(polyline);
+
+        // 添加关键节点标记
+        routePoints.forEach(function(point, index) {
+            var pt = new BMap.Point(point.lng, point.lat);
+            var icon, label;
+            
+            if (point.type === "start" || point.type === "end") {
+                icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='40'%3E%3Cpath d='M15,0 C6.7,0 0,6.7 0,15 C0,26.2 15,40 15,40 S30,26.2 30,15 C30,6.7 23.3,0 15,0 Z' fill='%2328a745'/%3E%3Ccircle cx='15' cy='15' r='8' fill='white'/%3E%3C/svg%3E", new BMap.Size(30, 40));
+                label = new BMap.Label(point.name, {offset: new BMap.Size(0, -45)});
+                label.setStyle({
+                    color: "#28a745",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    border: "none",
+                    backgroundColor: "white",
+                    padding: "5px 10px",
+                    borderRadius: "4px",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+                });
+            } else {
+                icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32'%3E%3Cpath d='M12,0 C5.4,0 0,5.4 0,12 C0,21 12,32 12,32 S24,21 24,12 C24,5.4 18.6,0 12,0 Z' fill='%23dc3545'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E", new BMap.Size(24, 32));
+                label = new BMap.Label(point.name, {offset: new BMap.Size(0, -38)});
+                label.setStyle({
+                    color: "#dc3545",
+                    fontSize: "12px",
+                    border: "none",
+                    backgroundColor: "white",
+                    padding: "3px 8px",
+                    borderRadius: "3px",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.2)"
+                });
+            }
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            marker.setLabel(label);
+            map.addOverlay(marker);
+        });
+
+        // 添加易错点标记（特别醒目）
+        warningPoints.forEach(function(point) {
+            var pt = new BMap.Point(point.lng, point.lat);
+            var icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%23ff6b6b'/%3E%3Ctext x='16' y='20' text-anchor='middle' font-size='18' font-weight='bold' fill='white'%3E⚠%3C/text%3E%3C/svg%3E", new BMap.Size(32, 42));
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            
+            var label = new BMap.Label(point.name, {offset: new BMap.Size(0, -48)});
+            label.setStyle({
+                color: "#ff6b6b",
+                fontSize: "13px",
+                fontWeight: "bold",
+                border: "2px solid #ff6b6b",
+                backgroundColor: "white",
+                padding: "4px 10px",
+                borderRadius: "4px",
+                boxShadow: "0 2px 8px rgba(255,107,107,0.4)"
+            });
+            marker.setLabel(label);
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#ff6b6b;font-size:15px;'>" + point.name + " - 易错点</h4>" +
+                "<p style='margin:0;color:#333;font-size:14px;line-height:1.6;'><strong>⚠️ 注意：</strong>" + point.warning + "</p>" +
+                "</div>",
+                {width: 320}
+            );
+            
+            marker.addEventListener("click", function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            // 添加闪烁动画效果
+            marker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                marker.setAnimation(null);
+            }, 3000);
+            
+            map.addOverlay(marker);
+        });
+
+        // 添加公厕标记
+        toilets.forEach(function(toilet) {
+            var pt = new BMap.Point(toilet.lng, toilet.lat);
+            var icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32'%3E%3Cpath d='M12,0 C5.4,0 0,5.4 0,12 C0,21 12,32 12,32 S24,21 24,12 C24,5.4 18.6,0 12,0 Z' fill='%23ffc107'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='14' fill='white'%3E🚻%3C/text%3E%3C/svg%3E", new BMap.Size(24, 32));
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:#333;'>" + toilet.name + "</h4>" +
+                "<p style='margin:0;color:#666;font-size:13px;'>" + toilet.address + "</p>" +
+                "</div>",
+                {width: 250}
+            );
+            
+            marker.addEventListener("click", function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            map.addOverlay(marker);
+        });
+
+        // 添加距离标尺
+        var distanceControl = new BMap.ScaleControl({anchor: BMAP_ANCHOR_BOTTOM_LEFT});
+        map.addControl(distanceControl);
+
+        // 添加缩放控件
+        var navigationControl = new BMap.NavigationControl({anchor: BMAP_ANCHOR_TOP_RIGHT});
+        map.addControl(navigationControl);
+    </script>
+</body>
+</html>
