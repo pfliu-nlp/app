@@ -1,0 +1,47 @@
+{
+  "timestamp": "2025-10-05T07:07:20.421Z",
+  "responseType": "stream",
+  "model": "anthropic/claude-sonnet-4.5",
+  "hasHtmlTags": false,
+  "htmlTags": [],
+  "textContent": null,
+  "textContentLength": 0,
+  "rawResponseData": {
+    "id": "gen-1759648038-oNyn3GKo2qOLwgS060cV",
+    "choices": [
+      {
+        "delta": {
+          "content": "",
+          "function_call": null,
+          "refusal": null,
+          "role": "assistant",
+          "tool_calls": null
+        },
+        "finish_reason": null,
+        "index": 0,
+        "logprobs": null,
+        "native_finish_reason": null
+      }
+    ],
+    "created": 1759648038,
+    "model": "anthropic/claude-sonnet-4.5",
+    "object": "chat.completion.chunk",
+    "service_tier": null,
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 83,
+      "prompt_tokens": 12945,
+      "total_tokens": 13028,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    },
+    "provider": "Google"
+  },
+  "analysis": {
+    "hasClosingTags": false,
+    "hasOpenTags": false,
+    "hasSelfClosingTags": false,
+    "tagCount": 0,
+    "containsClosingSequence": false
+  }
+}

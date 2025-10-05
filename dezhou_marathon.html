@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>山东德州马拉松路线规划 - 43公里环城跑</title>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .info-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .info-panel h2 {
+            color: #FF6B6B;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #FF6B6B;
+            padding-left: 10px;
+        }
+        .route-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: linear-gradient(135deg, #FF6B6B15 0%, #FF8E5315 100%);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #FF6B6B;
+        }
+        .info-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-card p {
+            font-size: 20px;
+            color: #333;
+            font-weight: bold;
+        }
+        .checkpoints {
+            margin-top: 15px;
+        }
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .checkpoint-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .checkpoint-number {
+            background: #FF6B6B;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .checkpoint-name {
+            font-weight: bold;
+            color: #333;
+            margin-right: 10px;
+            flex: 1;
+        }
+        .checkpoint-distance {
+            color: #666;
+            font-size: 14px;
+            margin-left: auto;
+        }
+        #map {
+            width: 100%;
+            height: 700px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .map-search-container {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .map-search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #FF6B6B;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .map-search-input:focus {
+            border-color: #FF8E53;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+        }
+        .map-search-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .map-search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+        .map-search-btn:active {
+            transform: translateY(0);
+        }
+        .search-result-panel {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .search-result-address {
+            font-size: 12px;
+            color: #666;
+        }
+        .location-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .location-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        .location-btn:active {
+            transform: translateY(0);
+        }
+        .location-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .location-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            font-size: 14px;
+        }
+        .location-info.show {
+            display: block;
+        }
+        .location-info strong {
+            color: #1976d2;
+        }
+        .location-accuracy {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .tips {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .tips h3 {
+            color: #0c5460;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .tips ul {
+            margin-left: 20px;
+            color: #0c5460;
+        }
+        .tips li {
+            margin-bottom: 5px;
+        }
+        .route-direction {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .route-direction h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .route-direction p {
+            color: #155724;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        .route-direction strong {
+            color: #28a745;
+        }
+        
+        /* 多人位置共享样式 */
+        .share-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .share-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .nickname-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #FF6B6B;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+        .nickname-input:focus {
+            border-color: #FF8E53;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+        }
+        .share-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .share-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+        .share-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .online-users {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .online-users h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: white;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .user-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .user-name {
+            flex: 1;
+            font-weight: bold;
+            color: #333;
+        }
+        .user-distance {
+            color: #666;
+            font-size: 12px;
+        }
+        .firebase-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .firebase-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .firebase-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃 山东德州马拉松路线规划</h1>
+        <p>全程约43公里 | 环城路线 | 体验德州城市风光</p>
+    </div>
+
+    <div class="container">
+        <div class="info-panel">
+            <div class="route-direction">
+                <h3>🧭 路线特色：德州环城马拉松</h3>
+                <p><strong>路线概述：</strong>这是一条环绕德州市区的马拉松路线，全程约43公里，起点和终点位于同一位置，形成完整的闭环。</p>
+                
+                <p><strong>🌆 城市风光：</strong>路线穿越德州市区主要区域，可以欣赏到德州的城市建设和自然风光。</p>
+                
+                <p><strong>⚠️ 注意事项：</strong>建议早晨6:00-8:00出发，避开交通高峰。注意交通安全，遵守交通规则。</p>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>📊 路线概况</h2>
+            <div class="route-info">
+                <div class="info-card">
+                    <h3>总距离</h3>
+                    <p>43 km</p>
+                </div>
+                <div class="info-card">
+                    <h3>路线类型</h3>
+                    <p>环形路线</p>
+                </div>
+                <div class="info-card">
+                    <h3>建议配速</h3>
+                    <p>5:30-6:00/km</p>
+                </div>
+                <div class="info-card">
+                    <h3>预计用时</h3>
+                    <p>3.5-4.5小时</p>
+                </div>
+                <div class="info-card">
+                    <h3>难度等级</h3>
+                    <p>中等</p>
+                </div>
+                <div class="info-card">
+                    <h3>最佳季节</h3>
+                    <p>春秋两季</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🚩 关键节点</h2>
+            <div class="checkpoints" id="checkpointsList">
+                <!-- 将通过JavaScript动态生成 -->
+            </div>
+            
+            <div class="tips">
+                <h3>💡 实用跑步建议</h3>
+                <ul>
+                    <li><strong>最佳时间：</strong>建议早上6:00-8:00出发，避开交通高峰，空气质量较好。</li>
+                    <li><strong>补给准备：</strong>携带能量胶3-4支、盐丸、水壶（750ml）。路线设有补给点：
+                        <ul style="margin-top: 5px;">
+                            <li>🏪 5km - 奥莱广场（补水）</li>
+                            <li>🏪 10km - 动植物园（补水+公厕）</li>
+                        </ul>
+                    </li>
+                    <li><strong>重要地标：</strong>
+                        <ul style="margin-top: 5px;">
+                            <li>🌉 减河大桥 - 注意转辅路</li>
+                            <li>🎯 15km - 民族公园</li>
+                            <li>🐴 20km - 马术俱乐部</li>
+                        </ul>
+                    </li>
+                    <li><strong>配速策略：</strong>前15km控制在5:45-6:00/km，中段15-30km可提速至5:30-5:45/km，最后13km根据体力调整。</li>
+                    <li><strong>安全注意：</strong>注意交通安全，遵守交通规则。在减河大桥处注意转辅路标识。建议结伴而行，携带手机保持联系。</li>
+                    <li><strong>装备建议：</strong>穿缓冲性好的跑鞋，根据季节准备合适的运动服装。夏季注意防晒和补水。</li>
+                    <li><strong>天气关注：</strong>出发前查看天气预报，避免在极端天气条件下跑步。</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🗺️ 路线地图</h2>
+            
+            <!-- 多人位置共享面板 -->
+            <div class="share-panel">
+                <div class="share-controls">
+                    <input type="text" id="nicknameInput" class="nickname-input" placeholder="输入你的昵称（如：小明）" maxlength="20" />
+                    <button id="shareBtn" class="share-btn">🌐 开始共享位置</button>
+                </div>
+                <div id="firebaseStatus" class="firebase-status">⏳ 正在连接服务器...</div>
+                <div id="onlineUsers" class="online-users" style="display: none;">
+                    <h4>📍 在线用户 (<span id="userCount">0</span>)</h4>
+                    <div id="userList"></div>
+                </div>
+            </div>
+            
+            <div class="map-search-container">
+                <input type="text" id="searchInput" class="map-search-input" placeholder="搜索地点（如：德州市政府、德州学院等）" />
+                <button id="searchBtn" class="map-search-btn">🔍 搜索</button>
+                <button id="locationBtn" class="location-btn">📍 定位</button>
+            </div>
+            <div id="locationInfo" class="location-info"></div>
+            <div id="searchResults" class="search-result-panel"></div>
+            <div id="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #FF6B6B;"></div>
+                    <span>跑步路线</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #28a745;"></div>
+                    <span>起点/终点</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #dc3545;"></div>
+                    <span>关键节点（每10km）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #FFA500;"></div>
+                    <span>🏪 补给点</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #9C27B0;"></div>
+                    <span>🎯 重要地标</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== Firebase 配置和初始化 ==========
+        const firebaseConfig = {
+          apiKey: "AIzaSyCVCpHY0yIj617UugtaN1iIGncoy9Ks3LI",
+          authDomain: "beijing-marathon-tracker.firebaseapp.com",
+          databaseURL: "https://beijing-marathon-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+          projectId: "beijing-marathon-tracker",
+          storageBucket: "beijing-marathon-tracker.firebasestorage.app",
+          messagingSenderId: "245823130801",
+          appId: "1:245823130801:web:d661ada76dc1e831afe690",
+          measurementId: "G-XL6V9Z467E"
+        };
+
+        // 初始化 Firebase
+        let firebaseApp = null;
+        let database = null;
+        let isFirebaseEnabled = false;
+        
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                isFirebaseEnabled = true;
+                console.log("✅ Firebase 初始化成功");
+            } else {
+                console.warn("⚠️ Firebase 配置未设置，多人共享功能将被禁用");
+            }
+        } catch (error) {
+            console.error("❌ Firebase 初始化失败:", error);
+            isFirebaseEnabled = false;
+        }
+
+        // 关键补给点和地标（根据用户提供的信息）
+        var keyLocations = [
+            {
+                name: "奥莱广场",
+                distance: 5,
+                type: "supply",
+                icon: "🏪",
+                facilities: ["补水"],
+                description: "5公里补给点 - 奥莱广场",
+                color: "#FFA500"
+            },
+            {
+                name: "动植物园",
+                distance: 10,
+                type: "supply",
+                icon: "🏪",
+                facilities: ["补水", "公厕"],
+                description: "10公里补给点 - 动植物园",
+                color: "#FFA500"
+            },
+            {
+                name: "减河大桥",
+                distance: null, // 将根据路线自动计算
+                type: "landmark",
+                icon: "🌉",
+                facilities: ["转辅路"],
+                description: "重要地标 - 减河大桥（转辅路）",
+                color: "#9C27B0"
+            },
+            {
+                name: "民族公园",
+                distance: 15,
+                type: "landmark",
+                icon: "🎯",
+                facilities: [],
+                description: "15公里地标 - 民族公园",
+                color: "#9C27B0"
+            },
+            {
+                name: "马术俱乐部",
+                distance: 20,
+                type: "landmark",
+                icon: "🐴",
+                facilities: [],
+                description: "20公里地标 - 马术俱乐部",
+                color: "#9C27B0"
+            }
+        ];
+        
+        // 从GPX文件解析的路线点（去重后）
+        // 每个点都会在点击时通过百度地图API自动获取详细地址
+        var routePoints = [
+            {lat: 37.445949, lng: 116.349171, name: "起点/终点", desc: "德州马拉松起点", type: "start"},
+            {lat: 37.418684, lng: 116.348494, name: "北段1", desc: "向南行进", type: "checkpoint"},
+            {lat: 37.418216, lng: 116.371764, name: "东北转角", desc: "向东转向", type: "checkpoint"},
+            {lat: 37.399920, lng: 116.371321, name: "东段1", desc: "东侧路段", type: "checkpoint"},
+            {lat: 37.400438, lng: 116.361017, name: "东段2", desc: "继续向南", type: "checkpoint"},
+            {lat: 37.397594, lng: 116.357238, name: "东段3", desc: "东侧中段", type: "checkpoint"},
+            {lat: 37.387509, lng: 116.355092, name: "东段4", desc: "东侧路段", type: "checkpoint"},
+            {lat: 37.378152, lng: 116.353460, name: "东段5", desc: "东侧路段", type: "checkpoint"},
+            {lat: 37.368791, lng: 116.349125, name: "东南段1", desc: "转向东南", type: "checkpoint"},
+            {lat: 37.357442, lng: 116.341535, name: "东南段2", desc: "东南方向", type: "checkpoint"},
+            {lat: 37.346334, lng: 116.339146, name: "东南段3", desc: "继续东南", type: "checkpoint"},
+            {lat: 37.344448, lng: 116.339008, name: "南段1", desc: "南侧路段", type: "checkpoint"},
+            {lat: 37.344062, lng: 116.341999, name: "南段2", desc: "南侧路段", type: "checkpoint"},
+            {lat: 37.338728, lng: 116.339525, name: "南段3", desc: "南侧路段", type: "checkpoint"},
+            {lat: 37.336356, lng: 116.334776, name: "南段4", desc: "南侧路段", type: "checkpoint"},
+            {lat: 37.334020, lng: 116.328076, name: "南段5", desc: "南侧路段", type: "checkpoint"},
+            {lat: 37.329992, lng: 116.323250, name: "西南段1", desc: "转向西南", type: "checkpoint"},
+            {lat: 37.325326, lng: 116.320658, name: "西南段2", desc: "西南方向", type: "checkpoint"},
+            {lat: 37.322446, lng: 116.314359, name: "西南段3", desc: "继续西南", type: "checkpoint"},
+            {lat: 37.322683, lng: 116.306259, name: "西南转角", desc: "向西转向", type: "checkpoint"},
+            {lat: 37.326156, lng: 116.300235, name: "西段1", desc: "西侧路段", type: "checkpoint"},
+            {lat: 37.327652, lng: 116.299077, name: "西段2", desc: "西侧路段", type: "checkpoint"},
+            {lat: 37.334189, lng: 116.285662, name: "最西点", desc: "路线最西端", type: "checkpoint"},
+            {lat: 37.333646, lng: 116.285223, name: "西段3", desc: "开始返回", type: "checkpoint"},
+            {lat: 37.327397, lng: 116.298477, name: "西段4", desc: "西侧路段", type: "checkpoint"},
+            {lat: 37.325838, lng: 116.299639, name: "西段5", desc: "西侧路段", type: "checkpoint"},
+            {lat: 37.322331, lng: 116.305981, name: "西北段1", desc: "转向西北", type: "checkpoint"},
+            {lat: 37.321903, lng: 116.314482, name: "西北段2", desc: "西北方向", type: "checkpoint"},
+            {lat: 37.324848, lng: 116.321179, name: "西北段3", desc: "继续西北", type: "checkpoint"},
+            {lat: 37.329703, lng: 116.324013, name: "西北段4", desc: "西北路段", type: "checkpoint"},
+            {lat: 37.333572, lng: 116.328396, name: "西北段5", desc: "西北路段", type: "checkpoint"},
+            {lat: 37.336038, lng: 116.334907, name: "西北段6", desc: "西北路段", type: "checkpoint"},
+            {lat: 37.338511, lng: 116.340094, name: "北段2", desc: "向北行进", type: "checkpoint"},
+            {lat: 37.344481, lng: 116.343008, name: "北段3", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.345029, lng: 116.339581, name: "北段4", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.357511, lng: 116.342335, name: "北段5", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.368617, lng: 116.349756, name: "北段6", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.378202, lng: 116.354104, name: "北段7", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.387505, lng: 116.355705, name: "北段8", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.397251, lng: 116.357579, name: "北段9", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.400104, lng: 116.361335, name: "北段10", desc: "北侧路段", type: "checkpoint"},
+            {lat: 37.399457, lng: 116.371404, name: "东北段", desc: "东北方向", type: "checkpoint"},
+            {lat: 37.418379, lng: 116.372242, name: "东北角", desc: "向北转向", type: "checkpoint"},
+            {lat: 37.419216, lng: 116.349244, name: "北段11", desc: "最后冲刺", type: "checkpoint"},
+            {lat: 37.445720, lng: 116.349799, name: "终点", desc: "完成全程！", type: "end"}
+        ];
+
+        // 计算累计距离
+        function haversine(lat1, lon1, lat2, lon2) {
+            var R = 6371;
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLon = (lon2 - lon1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 计算每个点的累计距离
+        var cumulativeDistance = 0;
+        for (var i = 0; i < routePoints.length; i++) {
+            if (i > 0) {
+                cumulativeDistance += haversine(
+                    routePoints[i-1].lat, routePoints[i-1].lng,
+                    routePoints[i].lat, routePoints[i].lng
+                );
+            }
+            routePoints[i].distance = cumulativeDistance;
+        }
+
+        // 生成关键节点列表（每5公里一个，包含补给点和地标）
+        function generateCheckpoints() {
+            var checkpointsList = document.getElementById('checkpointsList');
+            var html = '';
+            var lastCheckpointDist = 0;
+            var checkpointNum = 0;
+            
+            // 起点
+            html += '<div class="checkpoint-item">' +
+                '<div class="checkpoint-number">起</div>' +
+                '<div class="checkpoint-name">' + routePoints[0].name + '</div>' +
+                '<div class="checkpoint-distance">0 km</div>' +
+                '</div>';
+            
+            // 合并路线点和关键位置，按距离排序
+            var allCheckpoints = [];
+            
+            // 添加每5公里的路线点
+            for (var i = 1; i < routePoints.length - 1; i++) {
+                if (routePoints[i].distance - lastCheckpointDist >= 5) {
+                    allCheckpoints.push({
+                        distance: routePoints[i].distance,
+                        name: routePoints[i].name,
+                        type: 'route',
+                        icon: null
+                    });
+                    lastCheckpointDist = routePoints[i].distance;
+                }
+            }
+            
+            // 添加关键位置（补给点和地标）
+            keyLocations.forEach(function(location) {
+                if (location.distance !== null) {
+                    var facilities = location.facilities.length > 0 
+                        ? ' (' + location.facilities.join('、') + ')' 
+                        : '';
+                    allCheckpoints.push({
+                        distance: location.distance,
+                        name: location.name + facilities,
+                        type: location.type,
+                        icon: location.icon,
+                        color: location.color
+                    });
+                }
+            });
+            
+            // 按距离排序
+            allCheckpoints.sort(function(a, b) {
+                return a.distance - b.distance;
+            });
+            
+            // 生成HTML
+            checkpointNum = 0;
+            allCheckpoints.forEach(function(checkpoint) {
+                checkpointNum++;
+                var itemStyle = '';
+                var numberStyle = '';
+                
+                if (checkpoint.type === 'supply') {
+                    itemStyle = 'style="background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%); border-left: 3px solid #FFA500;"';
+                    numberStyle = 'style="background: #FFA500;"';
+                } else if (checkpoint.type === 'landmark') {
+                    itemStyle = 'style="background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%); border-left: 3px solid #9C27B0;"';
+                    numberStyle = 'style="background: #9C27B0;"';
+                }
+                
+                var iconHtml = checkpoint.icon ? checkpoint.icon + ' ' : '';
+                
+                html += '<div class="checkpoint-item" ' + itemStyle + '>' +
+                    '<div class="checkpoint-number" ' + numberStyle + '>' + checkpointNum + '</div>' +
+                    '<div class="checkpoint-name">' + iconHtml + checkpoint.name + '</div>' +
+                    '<div class="checkpoint-distance">~' + checkpoint.distance.toFixed(1) + ' km</div>' +
+                    '</div>';
+            });
+            
+            // 终点
+            var lastPoint = routePoints[routePoints.length - 1];
+            html += '<div class="checkpoint-item">' +
+                '<div class="checkpoint-number">终</div>' +
+                '<div class="checkpoint-name">' + lastPoint.name + '</div>' +
+                '<div class="checkpoint-distance">~' + lastPoint.distance.toFixed(1) + ' km</div>' +
+                '</div>';
+            
+            checkpointsList.innerHTML = html;
+        }
+
+        generateCheckpoints();
+
+        // 初始化地图
+        var map = new BMap.Map("map");
+        var centerPoint = new BMap.Point(116.32, 37.38); // 德州市中心
+        map.centerAndZoom(centerPoint, 12);
+        map.enableScrollWheelZoom(true);
+
+        // 绘制路线
+        var polylinePoints = [];
+        routePoints.forEach(function(point) {
+            polylinePoints.push(new BMap.Point(point.lng, point.lat));
+        });
+
+        var polyline = new BMap.Polyline(polylinePoints, {
+            strokeColor: "#FF6B6B",
+            strokeWeight: 4,
+            strokeOpacity: 0.8
+        });
+        map.addOverlay(polyline);
+
+        // 添加起点和终点标记（带地址信息）
+        var startPoint = new BMap.Point(routePoints[0].lng, routePoints[0].lat);
+        var startIcon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='40'%3E%3Cpath d='M15,0 C6.7,0 0,6.7 0,15 C0,26.2 15,40 15,40 S30,26.2 30,15 C30,6.7 23.3,0 15,0 Z' fill='%2328a745'/%3E%3Ccircle cx='15' cy='15' r='8' fill='white'/%3E%3C/svg%3E", new BMap.Size(30, 40));
+        
+        var startLabelStyle = {
+            color: "#28a745",
+            fontSize: "14px",
+            fontWeight: "bold",
+            border: "none",
+            backgroundColor: "white",
+            padding: "5px 10px",
+            borderRadius: "4px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+        };
+        
+        var startMarker = addMarkerWithGeocode(startPoint, routePoints[0], startIcon, "起点/终点", startLabelStyle);
+
+        // 创建地理编码服务实例
+        var geocoder = new BMap.Geocoder();
+        
+        // 为标记添加点击事件，显示详细地址信息
+        function addMarkerWithGeocode(point, pointData, icon, labelText, labelStyle) {
+            var marker = new BMap.Marker(point, {icon: icon});
+            
+            if (labelText) {
+                var label = new BMap.Label(labelText, {offset: new BMap.Size(0, -38)});
+                label.setStyle(labelStyle);
+                marker.setLabel(label);
+            }
+            
+            // 点击标记时获取详细地址
+            marker.addEventListener('click', function() {
+                // 显示加载提示
+                var loadingWindow = new BMap.InfoWindow(
+                    "<div style='padding:10px;text-align:center;'>⏳ 正在获取地址信息...</div>",
+                    {width: 250}
+                );
+                this.openInfoWindow(loadingWindow);
+                
+                // 逆地理编码获取地址
+                geocoder.getLocation(point, function(result) {
+                    if (result) {
+                        var address = result.address;
+                        var surroundingPois = result.surroundingPois || [];
+                        var nearbyPoi = surroundingPois.length > 0 ? surroundingPois[0].title : '';
+                        
+                        var infoHtml = "<div style='padding:12px;max-width:350px;'>" +
+                            "<h4 style='margin:0 0 10px 0;color:#FF6B6B;font-size:16px;'>" +
+                            "📍 " + pointData.name + "</h4>" +
+                            "<p style='margin:0 0 8px 0;color:#666;font-size:13px;line-height:1.6;'>" +
+                            "<strong>描述：</strong>" + pointData.desc + "</p>" +
+                            "<p style='margin:0 0 8px 0;color:#666;font-size:13px;line-height:1.6;'>" +
+                            "<strong>地址：</strong>" + address + "</p>";
+                        
+                        if (nearbyPoi) {
+                            infoHtml += "<p style='margin:0 0 8px 0;color:#666;font-size:13px;'>" +
+                                "<strong>附近：</strong>" + nearbyPoi + "</p>";
+                        }
+                        
+                        infoHtml += "<p style='margin:0 0 4px 0;color:#999;font-size:12px;'>" +
+                            "坐标：" + pointData.lat.toFixed(6) + ", " + pointData.lng.toFixed(6) + "</p>";
+                        
+                        if (pointData.distance !== undefined) {
+                            infoHtml += "<p style='margin:0;color:#FF6B6B;font-size:13px;font-weight:bold;'>" +
+                                "累计距离：" + pointData.distance.toFixed(2) + " km</p>";
+                        }
+                        
+                        infoHtml += "</div>";
+                        
+                        var infoWindow = new BMap.InfoWindow(infoHtml, {width: 370});
+                        marker.openInfoWindow(infoWindow);
+                    } else {
+                        // 如果获取地址失败，显示基本信息
+                        var basicInfoHtml = "<div style='padding:12px;max-width:300px;'>" +
+                            "<h4 style='margin:0 0 10px 0;color:#FF6B6B;font-size:16px;'>" +
+                            "📍 " + pointData.name + "</h4>" +
+                            "<p style='margin:0 0 8px 0;color:#666;font-size:13px;'>" +
+                            "<strong>描述：</strong>" + pointData.desc + "</p>" +
+                            "<p style='margin:0 0 4px 0;color:#999;font-size:12px;'>" +
+                            "坐标：" + pointData.lat.toFixed(6) + ", " + pointData.lng.toFixed(6) + "</p>";
+                        
+                        if (pointData.distance !== undefined) {
+                            basicInfoHtml += "<p style='margin:0;color:#FF6B6B;font-size:13px;font-weight:bold;'>" +
+                                "累计距离：" + pointData.distance.toFixed(2) + " km</p>";
+                        }
+                        
+                        basicInfoHtml += "</div>";
+                        
+                        var basicInfoWindow = new BMap.InfoWindow(basicInfoHtml, {width: 320});
+                        marker.openInfoWindow(basicInfoWindow);
+                    }
+                });
+            });
+            
+            map.addOverlay(marker);
+            return marker;
+        }
+        
+        // 添加关键节点标记（每10公里）
+        var lastMarkerDist = 0;
+        for (var i = 1; i < routePoints.length - 1; i++) {
+            if (routePoints[i].distance - lastMarkerDist >= 10) {
+                var pt = new BMap.Point(routePoints[i].lng, routePoints[i].lat);
+                var icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32'%3E%3Cpath d='M12,0 C5.4,0 0,5.4 0,12 C0,21 12,32 12,32 S24,21 24,12 C24,5.4 18.6,0 12,0 Z' fill='%23dc3545'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E", new BMap.Size(24, 32));
+                
+                var labelStyle = {
+                    color: "#dc3545",
+                    fontSize: "12px",
+                    border: "none",
+                    backgroundColor: "white",
+                    padding: "3px 8px",
+                    borderRadius: "3px",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.2)"
+                };
+                
+                addMarkerWithGeocode(pt, routePoints[i], icon, routePoints[i].distance.toFixed(0) + "km", labelStyle);
+                lastMarkerDist = routePoints[i].distance;
+            }
+        }
+
+        // 为所有路线点添加小标记（可点击查看详细地址）
+        console.log("添加所有路线点标记...");
+        for (var i = 0; i < routePoints.length; i++) {
+            // 跳过已经添加的起点和10公里标记点
+            if (i === 0) continue; // 起点已添加
+            
+            var shouldSkip = false;
+            var checkDist = 0;
+            for (var j = 1; j < i; j++) {
+                if (routePoints[j].distance - checkDist >= 10) {
+                    if (j === i) {
+                        shouldSkip = true;
+                        break;
+                    }
+                    checkDist = routePoints[j].distance;
+                }
+            }
+            
+            if (!shouldSkip) {
+                var pt = new BMap.Point(routePoints[i].lng, routePoints[i].lat);
+                // 使用小圆点标记
+                var smallIcon = new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='5' fill='%23FF6B6B' stroke='white' stroke-width='1'/%3E%3C/svg%3E",
+                    new BMap.Size(12, 12),
+                    {anchor: new BMap.Size(6, 6)}
+                );
+                
+                addMarkerWithGeocode(pt, routePoints[i], smallIcon, null, null);
+            }
+        }
+        
+        // ========== 添加关键位置标记（补给点和地标）==========
+        console.log("添加关键位置标记...");
+        
+        // 根据距离找到最接近的路线点
+        function findNearestPointByDistance(targetDistance) {
+            var minDiff = Infinity;
+            var nearestPoint = null;
+            
+            for (var i = 0; i < routePoints.length; i++) {
+                var diff = Math.abs(routePoints[i].distance - targetDistance);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    nearestPoint = routePoints[i];
+                }
+            }
+            
+            return nearestPoint;
+        }
+        
+        // 为每个关键位置添加标记
+        keyLocations.forEach(function(location) {
+            var targetPoint = null;
+            
+            // 如果有指定距离，找到最接近的路线点
+            if (location.distance !== null) {
+                targetPoint = findNearestPointByDistance(location.distance);
+            } else {
+                // 对于减河大桥，我们需要通过名称搜索来定位
+                // 暂时跳过，稍后通过搜索功能添加
+                return;
+            }
+            
+            if (targetPoint) {
+                var pt = new BMap.Point(targetPoint.lng, targetPoint.lat);
+                
+                // 创建自定义图标
+                var iconSvg = location.type === 'supply' 
+                    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='" + encodeURIComponent(location.color) + "'/%3E%3Ccircle cx='16' cy='16' r='10' fill='white'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-size='16' fill='" + encodeURIComponent(location.color) + "'%3E" + location.icon + "%3C/text%3E%3C/svg%3E"
+                    : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='" + encodeURIComponent(location.color) + "'/%3E%3Ccircle cx='16' cy='16' r='10' fill='white'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-size='16' fill='" + encodeURIComponent(location.color) + "'%3E" + location.icon + "%3C/text%3E%3C/svg%3E";
+                
+                var keyIcon = new BMap.Icon(iconSvg, new BMap.Size(32, 42));
+                var keyMarker = new BMap.Marker(pt, {icon: keyIcon});
+                
+                // 添加标签
+                var keyLabel = new BMap.Label(location.name, {offset: new BMap.Size(0, -48)});
+                keyLabel.setStyle({
+                    color: location.color,
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    border: "2px solid " + location.color,
+                    backgroundColor: "white",
+                    padding: "4px 10px",
+                    borderRadius: "4px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
+                });
+                keyMarker.setLabel(keyLabel);
+                
+                // 创建信息窗口
+                var facilitiesHtml = '';
+                if (location.facilities.length > 0) {
+                    facilitiesHtml = "<p style='margin:8px 0 0 0;color:#666;font-size:13px;'>" +
+                        "<strong>设施：</strong>" + location.facilities.join("、") + "</p>";
+                }
+                
+                var infoWindowHtml = "<div style='padding:12px;max-width:300px;'>" +
+                    "<h4 style='margin:0 0 10px 0;color:" + location.color + ";font-size:16px;'>" +
+                    location.icon + " " + location.name + "</h4>" +
+                    "<p style='margin:0 0 8px 0;color:#666;font-size:14px;'>" +
+                    location.description + "</p>" +
+                    facilitiesHtml +
+                    "<p style='margin:8px 0 0 0;color:#999;font-size:12px;'>" +
+                    "距离起点：约 " + location.distance + " 公里</p>" +
+                    "</div>";
+                
+                var keyInfoWindow = new BMap.InfoWindow(infoWindowHtml, {width: 320});
+                
+                keyMarker.addEventListener('click', function() {
+                    this.openInfoWindow(keyInfoWindow);
+                });
+                
+                // 添加动画效果
+                keyMarker.setAnimation(BMAP_ANIMATION_BOUNCE);
+                setTimeout(function() {
+                    keyMarker.setAnimation(null);
+                }, 2000);
+                
+                map.addOverlay(keyMarker);
+                
+                console.log("已添加关键位置: " + location.name + " (" + location.distance + "km)");
+            }
+        });
+        
+        // 添加距离标尺
+        var distanceControl = new BMap.ScaleControl({anchor: BMAP_ANCHOR_BOTTOM_LEFT});
+        map.addControl(distanceControl);
+
+        // 添加缩放控件
+        var navigationControl = new BMap.NavigationControl({anchor: BMAP_ANCHOR_TOP_RIGHT});
+        map.addControl(navigationControl);
+
+        // ========== 地点搜索功能 ==========
+        var searchMarker = null;
+        var localSearch = new BMap.LocalSearch(map, {
+            onSearchComplete: function(results) {
+                var resultsPanel = document.getElementById('searchResults');
+                resultsPanel.innerHTML = '';
+                
+                if (localSearch.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var resultsHtml = '';
+                    var resultsCount = Math.min(results.getCurrentNumPois(), 5);
+                    
+                    for (var i = 0; i < resultsCount; i++) {
+                        var poi = results.getPoi(i);
+                        resultsHtml += '<div class="search-result-item" data-index="' + i + '">' +
+                            '<div class="search-result-title">' + poi.title + '</div>' +
+                            '<div class="search-result-address">' + poi.address + '</div>' +
+                            '</div>';
+                    }
+                    
+                    resultsPanel.innerHTML = resultsHtml;
+                    resultsPanel.style.display = 'block';
+                    
+                    var resultItems = resultsPanel.getElementsByClassName('search-result-item');
+                    for (var i = 0; i < resultItems.length; i++) {
+                        resultItems[i].addEventListener('click', function() {
+                            var index = parseInt(this.getAttribute('data-index'));
+                            var poi = results.getPoi(index);
+                            showSearchResult(poi);
+                            resultsPanel.style.display = 'none';
+                        });
+                    }
+                } else {
+                    resultsPanel.innerHTML = '<div class="search-result-item">未找到相关地点，请尝试其他关键词</div>';
+                    resultsPanel.style.display = 'block';
+                }
+            }
+        });
+
+        function showSearchResult(poi) {
+            if (searchMarker) {
+                map.removeOverlay(searchMarker);
+            }
+            
+            var point = poi.point;
+            var icon = new BMap.Icon(
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%2300bcd4'/%3E%3Ccircle cx='16' cy='16' r='8' fill='white'/%3E%3C/svg%3E",
+                new BMap.Size(32, 42)
+            );
+            
+            searchMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(searchMarker);
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#00bcd4;font-size:16px;'>" + poi.title + "</h4>" +
+                "<p style='margin:0 0 8px 0;color:#666;font-size:14px;'><strong>地址：</strong>" + poi.address + "</p>" +
+                (poi.phoneNumber ? "<p style='margin:0;color:#666;font-size:14px;'><strong>电话：</strong>" + poi.phoneNumber + "</p>" : "") +
+                "</div>",
+                {width: 320}
+            );
+            
+            searchMarker.openInfoWindow(infoWindow);
+            map.centerAndZoom(point, 15);
+            
+            searchMarker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                searchMarker.setAnimation(null);
+            }, 2000);
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            var keyword = document.getElementById('searchInput').value.trim();
+            if (keyword) {
+                localSearch.search(keyword);
+            } else {
+                alert('请输入搜索关键词');
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('searchBtn').click();
+            }
+        });
+
+        map.addEventListener('click', function() {
+            document.getElementById('searchResults').style.display = 'none';
+        });
+
+        document.addEventListener('click', function(e) {
+            var resultsPanel = document.getElementById('searchResults');
+            var searchContainer = document.querySelector('.map-search-container');
+            if (!resultsPanel.contains(e.target) && !searchContainer.contains(e.target)) {
+                resultsPanel.style.display = 'none';
+            }
+        });
+
+        // ========== 多人位置共享功能 ==========
+        var isSharing = false;
+        var myUserId = null;
+        var myNickname = null;
+        var otherUsersMarkers = {};
+        var userColors = {};
+        var availableColors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+        ];
+        var colorIndex = 0;
+
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function getUserColor(userId) {
+            if (!userColors[userId]) {
+                userColors[userId] = availableColors[colorIndex % availableColors.length];
+                colorIndex++;
+            }
+            return userColors[userId];
+        }
+
+        function createOtherUserIcon(color, heading) {
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3Cpath d='M 18 6 L 22 14 L 18 12 L 14 14 Z' fill='white' transform='rotate(" + heading + " 18 18)'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            } else {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            }
+        }
+
+        function updateOnlineUsersList(users) {
+            var userList = document.getElementById('userList');
+            var userCount = document.getElementById('userCount');
+            var onlineUsersDiv = document.getElementById('onlineUsers');
+            
+            var count = 0;
+            var html = '';
+            
+            for (var userId in users) {
+                if (userId === myUserId) continue;
+                
+                var user = users[userId];
+                var color = getUserColor(userId);
+                count++;
+                
+                var distance = '';
+                if (lastPosition && user.lat && user.lng) {
+                    var userPoint = new BMap.Point(user.lng, user.lat);
+                    var myPoint = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                    var dist = map.getDistance(userPoint, myPoint);
+                    if (dist < 1000) {
+                        distance = Math.round(dist) + 'm';
+                    } else {
+                        distance = (dist / 1000).toFixed(1) + 'km';
+                    }
+                }
+                
+                html += '<div class="user-item">' +
+                    '<div class="user-color" style="background: ' + color + ';"></div>' +
+                    '<div class="user-name">' + (user.nickname || '匿名用户') + '</div>' +
+                    (distance ? '<div class="user-distance">' + distance + '</div>' : '') +
+                    '</div>';
+            }
+            
+            userCount.textContent = count;
+            userList.innerHTML = html || '<div style="text-align:center;color:#999;padding:10px;">暂无其他用户在线</div>';
+            onlineUsersDiv.style.display = isSharing ? 'block' : 'none';
+        }
+
+        function updateOtherUserMarker(userId, userData) {
+            if (userId === myUserId) return;
+            
+            var point = new BMap.Point(userData.lng, userData.lat);
+            var color = getUserColor(userId);
+            
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                if (otherUsersMarkers[userId].label) {
+                    map.removeOverlay(otherUsersMarkers[userId].label);
+                }
+            }
+            
+            var icon = createOtherUserIcon(color, userData.heading);
+            var marker = new BMap.Marker(point, {icon: icon});
+            
+            var circle = new BMap.Circle(point, userData.accuracy || 50, {
+                strokeColor: color,
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                fillColor: color,
+                fillOpacity: 0.1
+            });
+            
+            var label = new BMap.Label(userData.nickname || '匿名', {
+                offset: new BMap.Size(0, -40)
+            });
+            label.setStyle({
+                color: color,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                border: 'none',
+                backgroundColor: 'white',
+                padding: '3px 8px',
+                borderRadius: '3px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+            });
+            
+            marker.setLabel(label);
+            
+            var speedKmh = userData.speed ? (userData.speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:" + color + ";'>👤 " + (userData.nickname || '匿名用户') + "</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (userData.heading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(userData.heading) + "°</p>" : "") +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#999;'>更新：" + new Date(userData.timestamp).toLocaleTimeString() + "</p>" +
+                "</div>",
+                {width: 200}
+            );
+            
+            marker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            map.addOverlay(marker);
+            map.addOverlay(circle);
+            
+            otherUsersMarkers[userId] = {marker: marker, circle: circle, label: label};
+        }
+
+        function removeUserMarker(userId) {
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                delete otherUsersMarkers[userId];
+            }
+        }
+
+        function startSharing() {
+            if (!isFirebaseEnabled) {
+                alert('❌ Firebase 未配置，无法使用多人共享功能。\n\n请按照 FIREBASE_SETUP.md 中的说明配置 Firebase。');
+                return;
+            }
+            
+            var nickname = document.getElementById('nicknameInput').value.trim();
+            if (!nickname) {
+                alert('请输入你的昵称');
+                document.getElementById('nicknameInput').focus();
+                return;
+            }
+            
+            myUserId = generateUserId();
+            myNickname = nickname;
+            isSharing = true;
+            
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🔴 停止共享';
+            shareBtn.classList.add('active');
+            document.getElementById('nicknameInput').disabled = true;
+            
+            database.ref('users').on('value', function(snapshot) {
+                var users = snapshot.val() || {};
+                updateOnlineUsersList(users);
+                
+                for (var userId in users) {
+                    updateOtherUserMarker(userId, users[userId]);
+                }
+                
+                for (var userId in otherUsersMarkers) {
+                    if (!users[userId]) {
+                        removeUserMarker(userId);
+                    }
+                }
+            });
+            
+            database.ref('users/' + myUserId).onDisconnect().remove();
+            
+            if (!isTracking) {
+                document.getElementById('locationBtn').click();
+            }
+        }
+
+        function stopSharing() {
+            if (!isFirebaseEnabled || !myUserId) return;
+            
+            isSharing = false;
+            
+            database.ref('users/' + myUserId).remove();
+            database.ref('users').off();
+            
+            for (var userId in otherUsersMarkers) {
+                removeUserMarker(userId);
+            }
+            otherUsersMarkers = {};
+            
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🌐 开始共享位置';
+            shareBtn.classList.remove('active');
+            document.getElementById('nicknameInput').disabled = false;
+            document.getElementById('onlineUsers').style.display = 'none';
+            
+            myUserId = null;
+            myNickname = null;
+        }
+
+        function updateMyLocationToFirebase(lat, lng, accuracy, speed, heading) {
+            if (!isSharing || !myUserId || !isFirebaseEnabled) return;
+            
+            database.ref('users/' + myUserId).set({
+                nickname: myNickname,
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy,
+                speed: speed || 0,
+                heading: heading || 0,
+                timestamp: Date.now()
+            });
+        }
+
+        if (isFirebaseEnabled) {
+            database.ref('.info/connected').on('value', function(snapshot) {
+                var statusDiv = document.getElementById('firebaseStatus');
+                if (snapshot.val() === true) {
+                    statusDiv.textContent = '✅ 服务器已连接';
+                    statusDiv.className = 'firebase-status connected';
+                } else {
+                    statusDiv.textContent = '❌ 服务器连接断开';
+                    statusDiv.className = 'firebase-status error';
+                }
+            });
+        } else {
+            var statusDiv = document.getElementById('firebaseStatus');
+            statusDiv.textContent = '⚠️ Firebase 未配置，请查看 FIREBASE_SETUP.md';
+            statusDiv.className = 'firebase-status error';
+        }
+
+        document.getElementById('shareBtn').addEventListener('click', function() {
+            if (isSharing) {
+                stopSharing();
+            } else {
+                startSharing();
+            }
+        });
+
+        // ========== 实时定位功能 ==========
+        var locationMarker = null;
+        var locationCircle = null;
+        var watchId = null;
+        var isTracking = false;
+        var lastPosition = null;
+        var currentHeading = 0;
+
+        function createLocationIcon(heading) {
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3Cpath d='M 20 8 L 24 16 L 20 14 L 16 16 Z' fill='white' transform='rotate(" + heading + " 20 20)'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            } else {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            }
+        }
+
+        function calculateHeading(lat1, lng1, lat2, lng2) {
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var lat1Rad = lat1 * Math.PI / 180;
+            var lat2Rad = lat2 * Math.PI / 180;
+            
+            var y = Math.sin(dLng) * Math.cos(lat2Rad);
+            var x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+            
+            var heading = Math.atan2(y, x) * 180 / Math.PI;
+            return (heading + 360) % 360;
+        }
+
+        function calculateDistanceToRoute(lat, lng) {
+            var userPoint = new BMap.Point(lng, lat);
+            var minDistance = Infinity;
+            var nearestPoint = null;
+
+            routePoints.forEach(function(point) {
+                var routePoint = new BMap.Point(point.lng, point.lat);
+                var distance = map.getDistance(userPoint, routePoint);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPoint = point;
+                }
+            });
+
+            return {
+                distance: Math.round(minDistance),
+                nearestPoint: nearestPoint
+            };
+        }
+
+        function updateLocationInfo(position, accuracy, routeInfo, speed, heading) {
+            var infoPanel = document.getElementById('locationInfo');
+            var distanceText = routeInfo.distance < 1000 
+                ? routeInfo.distance + '米' 
+                : (routeInfo.distance / 1000).toFixed(2) + '公里';
+            
+            var statusEmoji = routeInfo.distance < 100 ? '✅' : routeInfo.distance < 500 ? '⚠️' : '❌';
+            var statusText = routeInfo.distance < 100 
+                ? '在路线上' 
+                : routeInfo.distance < 500 
+                ? '接近路线' 
+                : '偏离路线';
+
+            var paceText = '';
+            if (speed && speed > 0.5) {
+                var kmPerHour = speed * 3.6;
+                var minPerKm = 60 / kmPerHour;
+                var paceMin = Math.floor(minPerKm);
+                var paceSec = Math.round((minPerKm - paceMin) * 60);
+                paceText = '<br>🏃 配速：' + paceMin + '\'' + (paceSec < 10 ? '0' : '') + paceSec + '"/km';
+            }
+
+            var directionText = '';
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                var directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+                var index = Math.round(heading / 45) % 8;
+                directionText = '<br>🧭 方向：' + directions[index] + ' (' + Math.round(heading) + '°)';
+            }
+
+            infoPanel.innerHTML = 
+                '<strong>' + statusEmoji + ' ' + statusText + '</strong><br>' +
+                '📍 最近节点：' + routeInfo.nearestPoint.name + '<br>' +
+                '📏 距离路线：' + distanceText +
+                paceText +
+                directionText +
+                '<br><span class="location-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>';
+            infoPanel.classList.add('show');
+        }
+
+        function onLocationSuccess(position) {
+            var lat = position.coords.latitude;
+            var lng = position.coords.longitude;
+            var accuracy = position.coords.accuracy;
+            var speed = position.coords.speed;
+            var heading = position.coords.heading;
+
+            var point = new BMap.Point(lng, lat);
+
+            if (lastPosition && speed && speed > 0.5) {
+                var calculatedHeading = calculateHeading(
+                    lastPosition.lat, 
+                    lastPosition.lng, 
+                    lat, 
+                    lng
+                );
+                currentHeading = heading !== null && heading !== undefined && !isNaN(heading) 
+                    ? heading 
+                    : calculatedHeading;
+            } else if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                currentHeading = heading;
+            }
+
+            lastPosition = {lat: lat, lng: lng};
+
+            if (locationMarker) {
+                map.removeOverlay(locationMarker);
+            }
+            if (locationCircle) {
+                map.removeOverlay(locationCircle);
+            }
+
+            var icon = createLocationIcon(currentHeading);
+            locationMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(locationMarker);
+
+            locationCircle = new BMap.Circle(point, accuracy, {
+                strokeColor: '#4285f4',
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                fillColor: '#4285f4',
+                fillOpacity: 0.1
+            });
+            map.addOverlay(locationCircle);
+
+            var routeInfo = calculateDistanceToRoute(lat, lng);
+            updateLocationInfo(position, accuracy, routeInfo, speed, currentHeading);
+            updateMyLocationToFirebase(lat, lng, accuracy, speed, currentHeading);
+
+            if (isTracking) {
+                map.panTo(point);
+            } else {
+                map.centerAndZoom(point, 16);
+            }
+
+            var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:#4285f4;'>📍 当前位置</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>纬度：" + lat.toFixed(6) + "</p>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>经度：" + lng.toFixed(6) + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (currentHeading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(currentHeading) + "°</p>" : "") +
+                "</div>",
+                {width: 250}
+            );
+
+            locationMarker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+        }
+
+        function onLocationError(error) {
+            var errorMsg = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = '❌ 定位失败：用户拒绝了定位请求';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = '❌ 定位失败：位置信息不可用';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = '❌ 定位失败：请求超时';
+                    break;
+                default:
+                    errorMsg = '❌ 定位失败：未知错误';
+            }
+            
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.innerHTML = '<strong>' + errorMsg + '</strong><br>' +
+                '<span class="location-accuracy">请确保已允许浏览器访问位置信息</span>';
+            infoPanel.classList.add('show');
+
+            stopTracking();
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能');
+                return;
+            }
+
+            isTracking = true;
+            var locationBtn = document.getElementById('locationBtn');
+            locationBtn.classList.add('active');
+            locationBtn.innerHTML = '🔴 停止定位';
+
+            watchId = navigator.geolocation.watchPosition(
+                onLocationSuccess,
+                onLocationError,
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+
+            isTracking = false;
+            lastPosition = null;
+            currentHeading = 0;
+            
+            var locationBtn = document.getElementById('locationBtn');
+            locationBtn.classList.remove('active');
+            locationBtn.innerHTML = '📍 定位';
+
+            if (locationMarker) {
+                map.removeOverlay(locationMarker);
+                locationMarker = null;
+            }
+            if (locationCircle) {
+                map.removeOverlay(locationCircle);
+                locationCircle = null;
+            }
+
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.classList.remove('show');
+        }
+
+        document.getElementById('locationBtn').addEventListener('click', function() {
+            if (isTracking) {
+                stopTracking();
+            } else {
+                startTracking();
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (isTracking) {
+                stopTracking();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北京二环马拉松路线规划 - 从西直门出发</title>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .info-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .info-panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #667eea;
+            padding-left: 10px;
+        }
+        .route-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .info-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-card p {
+            font-size: 20px;
+            color: #333;
+            font-weight: bold;
+        }
+        .checkpoints {
+            margin-top: 15px;
+        }
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .checkpoint-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .checkpoint-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .checkpoint-name {
+            font-weight: bold;
+            color: #333;
+            margin-right: 10px;
+        }
+        .checkpoint-distance {
+            color: #666;
+            font-size: 14px;
+            margin-left: auto;
+        }
+        .toilet-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #fff3cd;
+            border-radius: 6px;
+            border-left: 3px solid #ffc107;
+        }
+        .toilet-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+        .toilet-info {
+            flex: 1;
+        }
+        .toilet-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .toilet-address {
+            color: #666;
+            font-size: 13px;
+        }
+        #map {
+            width: 100%;
+            height: 700px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .map-search-container {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .map-search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .map-search-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .map-search-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .map-search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .map-search-btn:active {
+            transform: translateY(0);
+        }
+        .search-result-panel {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .search-result-address {
+            font-size: 12px;
+            color: #666;
+        }
+        .location-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .location-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        .location-btn:active {
+            transform: translateY(0);
+        }
+        .location-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .location-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            font-size: 14px;
+        }
+        .location-info.show {
+            display: block;
+        }
+        .location-info strong {
+            color: #1976d2;
+        }
+        .location-accuracy {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .tips {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .tips h3 {
+            color: #0c5460;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .tips ul {
+            margin-left: 20px;
+            color: #0c5460;
+        }
+        .tips li {
+            margin-bottom: 5px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ff6b6b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .warning-box h3 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .warning-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #ff6b6b;
+        }
+        .warning-item h4 {
+            color: #ff6b6b;
+            margin-bottom: 6px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .warning-number {
+            background: #ff6b6b;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+        .warning-item p {
+            color: #666;
+            font-size: 13px;
+            margin: 0;
+            line-height: 1.6;
+        }
+        .route-direction {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .route-direction h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .route-direction p {
+            color: #155724;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        .route-direction strong {
+            color: #28a745;
+        }
+        
+        /* 多人位置共享样式 */
+        .share-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .share-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .nickname-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+        .nickname-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .share-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .share-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .share-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .online-users {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .online-users h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: white;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .user-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .user-name {
+            flex: 1;
+            font-weight: bold;
+            color: #333;
+        }
+        .user-distance {
+            color: #666;
+            font-size: 12px;
+        }
+        .firebase-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .firebase-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .firebase-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃 北京二环马拉松路线规划</h1>
+        <p>起点：西直门 | 全程约32.7公里（实际约33.4km） | 沿二环路辅路 | 经过29座立交桥</p>
+    </div>
+
+    <div class="container">
+        <div class="info-panel">
+            <div class="route-direction">
+                <h3>🧭 路线说明：北京二环路完整环线（32.7公里）</h3>
+                <p><strong>⚠️ 重要提示：</strong>永定门、右安门、左安门、广渠门、东便门、西便门、广安门虽然是古代"外七门"，但它们的<strong>滨河路段确实是现代二环路的组成部分</strong>！二环路沿护城河修建，南段和东南段都是滨河路。</p>
+                <p><strong>顺时针方向：</strong>从西直门出发，先向东（德胜门→安定门→东直门→朝阳门），再向南（建国门→东便门→广渠门→左安门），然后向西（永定门→右安门→广安门→西便门），最后向北（复兴门→阜成门）回到西直门。</p>
+                
+                <p><strong>🌳 西二环（约8km）：</strong>城市绿道系统，有塑胶跑道+地砖双层设计，金融街区域有标准百米赛道。树荫覆盖，空气清新。</p>
+                
+                <p><strong>🏞️ 北护城河（约6.4km）：</strong>太平湖→东直门，全长6.36公里。有荷风轩、浮烟舫、盈玉洲等园林小品，木栈道、九曲桥，夏季荷花盛开。<span style="color:#28a745;font-weight:bold;">最美滨水步道！</span></p>
+                
+                <p><strong>🏛️ 东二环（约8km）：</strong>建国门到东便门段有明城墙遗址公园，古朴步道，可观赏古观象台和明城墙。其他路段为城市绿道。</p>
+                
+                <p><strong>🌊 南二环+东南段（约10km）：</strong>护城河绿道全程伴随，<span style="color:#ff6b6b;font-weight:bold;">一定要从马路下到河堤绿道上跑</span>。有二十四节气公园、左安门角楼、百米梅廊等景点。绿树成荫，河景优美。</p>
+                
+                <p><strong>⚠️ 注意事项：</strong>北二环部分路段需过红绿灯，建议早晨5:30-7:00出发避开车流。部分桥下通道光线较暗，注意安全。</p>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>📊 路线概况</h2>
+            <div class="route-info">
+                <div class="info-card">
+                    <h3>总距离</h3>
+                    <p>33 km</p>
+                </div>
+                <div class="info-card">
+                    <h3>起点/终点</h3>
+                    <p>西直门</p>
+                </div>
+                <div class="info-card">
+                    <h3>绿道比例</h3>
+                    <p>约80%</p>
+                </div>
+                <div class="info-card">
+                    <h3>建议配速</h3>
+                    <p>5:00-5:30/km</p>
+                </div>
+                <div class="info-card">
+                    <h3>预计用时</h3>
+                    <p>2.5-3小时</p>
+                </div>
+                <div class="info-card">
+                    <h3>路面类型</h3>
+                    <p>塑胶跑道+步道</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🚩 关键节点（顺时针方向）</h2>
+            <div class="checkpoints">
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">起</div>
+                    <div class="checkpoint-name">西直门</div>
+                    <div class="checkpoint-distance">0 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">1</div>
+                    <div class="checkpoint-name">德胜门</div>
+                    <div class="checkpoint-distance">~2.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">2</div>
+                    <div class="checkpoint-name">安定门</div>
+                    <div class="checkpoint-distance">~5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">3</div>
+                    <div class="checkpoint-name">东直门</div>
+                    <div class="checkpoint-distance">~7.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">4</div>
+                    <div class="checkpoint-name">朝阳门</div>
+                    <div class="checkpoint-distance">~10 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">5</div>
+                    <div class="checkpoint-name">建国门</div>
+                    <div class="checkpoint-distance">~12.5 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">6</div>
+                    <div class="checkpoint-name">东便门</div>
+                    <div class="checkpoint-distance">~15 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">7</div>
+                    <div class="checkpoint-name">广渠门</div>
+                    <div class="checkpoint-distance">~17 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">8</div>
+                    <div class="checkpoint-name">左安门</div>
+                    <div class="checkpoint-distance">~19 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">9</div>
+                    <div class="checkpoint-name">永定门</div>
+                    <div class="checkpoint-distance">~21 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">10</div>
+                    <div class="checkpoint-name">右安门</div>
+                    <div class="checkpoint-distance">~23 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">11</div>
+                    <div class="checkpoint-name">广安门</div>
+                    <div class="checkpoint-distance">~25 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">12</div>
+                    <div class="checkpoint-name">西便门</div>
+                    <div class="checkpoint-distance">~27 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">13</div>
+                    <div class="checkpoint-name">复兴门</div>
+                    <div class="checkpoint-distance">~29 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">14</div>
+                    <div class="checkpoint-name">阜成门</div>
+                    <div class="checkpoint-distance">~31 km</div>
+                </div>
+                <div class="checkpoint-item">
+                    <div class="checkpoint-number">终</div>
+                    <div class="checkpoint-name">返回西直门</div>
+                    <div class="checkpoint-distance">~33 km</div>
+                </div>
+            </div>
+            
+            <div class="tips">
+                <h3>🎯 各路段特色详解</h3>
+                <ul>
+                    <li><strong>西直门→德胜门→安定门（0-5km）：</strong>北二环城市绿道，需过西直门桥、德胜门桥、安定门桥。早晨车流较大，注意红绿灯。</li>
+                    <li><strong>安定门→东直门（5-7.5km）：</strong>进入北护城河滨水步道！从安定门东滨河路开始，沿河景观优美，有园林小品。</li>
+                    <li><strong>东直门→朝阳门→建国门（7.5-12.5km）：</strong>东二环城市绿道，朝阳门、建国门桥区车流密集。</li>
+                    <li><strong>建国门→东便门（12.5-15km）：</strong>明城墙遗址公园段，古朴步道，可观赏古观象台和明城墙，文化气息浓厚。</li>
+                    <li><strong>东便门→广渠门→左安门（15-19km）：</strong>东南护城河绿道，<span style="color:#ff6b6b;font-weight:bold;">过东便门桥后尽早下到河堤绿道</span>，塑胶跑道，景色优美。</li>
+                    <li><strong>左安门→永定门→右安门（19-23km）：</strong>南护城河绿道，有左安门角楼、百米梅廊、永定门公园，继续沿河堤绿道跑。</li>
+                    <li><strong>右安门→广安门→西便门（23-27km）：</strong>西南护城河绿道，广安门桥附近水鸟众多，生态环境好。天宁寺桥处绿道结束，上马路继续向北。</li>
+                    <li><strong>西便门→复兴门→阜成门（27-31km）：</strong>西二环城市绿道，金融街区域有塑胶跑道和百米赛道，树荫覆盖。复兴门走桥下通道。</li>
+                    <li><strong>阜成门→西直门（31-33km）：</strong>最后冲刺段，西二环绿道，回到起点完成全程！</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>⚠️ 五个易错关键点（必看！）</h2>
+            <div class="warning-box">
+                <h3>根据跑友实战经验，以下5个位置最容易跑错，请特别注意！</h3>
+                
+                <div class="warning-item">
+                    <h4><span class="warning-number">①</span>东便门桥</h4>
+                    <p><strong>位置：</strong>东二环与长安街交叉口（约15km处）</p>
+                    <p><strong>正确做法：</strong>从建国门向南到东便门，<span style="color:#ff6b6b;font-weight:bold;">过桥后尽早下到护城河河堤的绿道</span>。路边有下行台阶，注意观察。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">②</span>广渠门桥</h4>
+                    <p><strong>位置：</strong>东南二环（约17km处）</p>
+                    <p><strong>正确做法：</strong>从东便门沿绿道向南，<span style="color:#ff6b6b;font-weight:bold;">继续保持在护城河河堤绿道上跑</span>。过广渠门桥后继续沿绿道向南。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">③</span>永定门到右安门段</h4>
+                    <p><strong>位置：</strong>南二环（约21-23km处）</p>
+                    <p><strong>正确做法：</strong>这段有护城河绿道，<span style="color:#ff6b6b;font-weight:bold;">尽量跑河堤绿道</span>，风景好且避开车流。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">④</span>天宁寺桥（西二环）</h4>
+                    <p><strong>位置：</strong>西二环南段，广安门到西便门之间（约26km处）</p>
+                    <p><strong>正确做法：</strong>从右安门、广安门向北，<span style="color:#ff6b6b;font-weight:bold;">继续在护城河绿道上跑</span>。绿道到天宁寺桥就结束了，在绿道上完全越过天宁寺桥后，第一个上行台阶上到马路继续向北。</p>
+                </div>
+
+                <div class="warning-item">
+                    <h4><span class="warning-number">⑤</span>复兴门</h4>
+                    <p><strong>位置：</strong>西二环与长安街交叉口（约29km处）</p>
+                    <p><strong>正确做法：</strong>过复兴门时，<span style="color:#ff6b6b;font-weight:bold;">走桥下的自行车道</span>，不要上桥。保持在内环（东侧）跑。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🚻 沿途公厕位置（重点标注）</h2>
+            <div class="checkpoints">
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">1. 西直门桥区公厕</div>
+                        <div class="toilet-address">西直门桥东北角，西直门外大街与北二环交叉口附近</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">2. 德胜门箭楼公厕</div>
+                        <div class="toilet-address">德胜门箭楼西侧，德胜门外大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">3. 安定门地铁站公厕</div>
+                        <div class="toilet-address">安定门地铁站A口附近，安定门外大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">4. 东直门桥区公厕</div>
+                        <div class="toilet-address">东直门桥西南角，东直门外大街与东二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">5. 朝阳门地铁站公厕</div>
+                        <div class="toilet-address">朝阳门地铁站C口附近，朝阳门内大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">6. 建国门桥区公厕</div>
+                        <div class="toilet-address">建国门桥东北角，建国门外大街与东二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">7. 明城墙遗址公园公厕</div>
+                        <div class="toilet-address">东便门附近，明城墙遗址公园内（东二环与崇文门东大街交叉口）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">8. 龙潭湖公园公厕</div>
+                        <div class="toilet-address">广渠门附近，龙潭湖公园北门（左安门内大街）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">9. 永定门公园公厕</div>
+                        <div class="toilet-address">永定门城楼附近，永定门公园内</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">10. 陶然亭公园公厕</div>
+                        <div class="toilet-address">右安门附近，陶然亭公园北门（太平街）</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">11. 广安门桥区公厕</div>
+                        <div class="toilet-address">广安门桥西北角，广安门外大街与南二环交叉口</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">12. 复兴门地铁站公厕</div>
+                        <div class="toilet-address">复兴门地铁站B口附近，复兴门内大街</div>
+                    </div>
+                </div>
+                <div class="toilet-item">
+                    <div class="toilet-icon">🚻</div>
+                    <div class="toilet-info">
+                        <div class="toilet-name">13. 阜成门地铁站公厕</div>
+                        <div class="toilet-address">阜成门地铁站A口附近，阜成门内大街</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips">
+                <h3>💡 实用跑步建议（基于跑友经验）</h3>
+                <ul>
+                    <li><strong>最佳时间：</strong>早上5:30-7:00出发最佳！避开车流高峰，空气质量好，北二环红绿灯少等待。周末人流较大，建议工作日跑。</li>
+                    <li><strong>路面选择：</strong>80%路段有专业绿道！南二环、西二环、北护城河有塑胶跑道，软硬适中保护膝盖。东二环部分路段为硬质步道。</li>
+                    <li><strong>绿道入口：</strong>关键位置要下到河堤绿道：①东便门桥后（15km）②广渠门桥后（17km）③右安门到广安门段（23-25km）。注意观察下行台阶标识。</li>
+                    <li><strong>补给准备：</strong>携带能量胶2-3支、盐丸、水壶（500ml）。建议在12km（建国门）和24km（广安门）处补充。沿途便利店较多。</li>
+                    <li><strong>配速策略：</strong>前10km控制在5:20-5:30/km（绿道少，红绿灯多），中段10-25km可提速至5:00-5:15/km（绿道为主），最后8km根据体力调整。</li>
+                    <li><strong>安全注意：</strong>桥下通道光线昏暗（小街桥、雍和宫桥等），建议佩戴头灯或手电。绿道上遵守"左快右慢"规则，礼让行人。</li>
+                    <li><strong>公厕分布：</strong>平均每2-3公里有公厕，地铁站附近、公园内都有。明城墙遗址公园、龙潭公园、陶然亭公园内设施完善。</li>
+                    <li><strong>景观打卡：</strong>北护城河荷花（夏季）、明城墙遗址、古观象台、左安门角楼、二十四节气公园，边跑边欣赏北京历史文化。</li>
+                    <li><strong>装备建议：</strong>穿缓冲性好的跑鞋，塑胶跑道对膝盖友好。秋冬季注意保暖，夏季防晒+补水。</li>
+                    <li><strong>跑后恢复：</strong>沿途有多个地铁站（西直门、德胜门、东直门、建国门等），可就近乘地铁回家。建议拉伸15-20分钟。</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>🗺️ 路线地图（带公厕标记）</h2>
+            
+            <!-- 多人位置共享面板 -->
+            <div class="share-panel">
+                <div class="share-controls">
+                    <input type="text" id="nicknameInput" class="nickname-input" placeholder="输入你的昵称（如：小明）" maxlength="20" />
+                    <button id="shareBtn" class="share-btn">🌐 开始共享位置</button>
+                </div>
+                <div id="firebaseStatus" class="firebase-status">⏳ 正在连接服务器...</div>
+                <div id="onlineUsers" class="online-users" style="display: none;">
+                    <h4>📍 在线用户 (<span id="userCount">0</span>)</h4>
+                    <div id="userList"></div>
+                </div>
+            </div>
+            
+            <div class="map-search-container">
+                <input type="text" id="searchInput" class="map-search-input" placeholder="搜索地点（如：天安门、北京大学、三里屯等）" />
+                <button id="searchBtn" class="map-search-btn">🔍 搜索</button>
+                <button id="locationBtn" class="location-btn">📍 定位</button>
+            </div>
+            <div id="locationInfo" class="location-info"></div>
+            <div id="searchResults" class="search-result-panel"></div>
+            <div id="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #667eea;"></div>
+                    <span>跑步路线</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #28a745;"></div>
+                    <span>起点/终点（西直门）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #ffc107;"></div>
+                    <span>公厕位置</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #dc3545;"></div>
+                    <span>关键节点</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #ff6b6b;"></div>
+                    <span>⚠️ 易错点（特别注意）</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== Firebase 配置和初始化 ==========
+        const firebaseConfig = {
+          apiKey: "YOUR_API_KEY",
+          authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+          databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+          projectId: "YOUR_PROJECT_ID",
+          storageBucket: "YOUR_PROJECT_ID.appspot.com",
+          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+          appId: "YOUR_APP_ID"
+        };
+
+        // 初始化 Firebase
+        let firebaseApp = null;
+        let database = null;
+        let isFirebaseEnabled = false;
+        
+        try {
+            // 检查配置是否已更新
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                isFirebaseEnabled = true;
+                console.log("✅ Firebase 初始化成功");
+            } else {
+                console.warn("⚠️ Firebase 配置未设置，多人共享功能将被禁用");
+            }
+        } catch (error) {
+            console.error("❌ Firebase 初始化失败:", error);
+            isFirebaseEnabled = false;
+        }
+
+        // 初始化地图
+        var map = new BMap.Map("map");
+        var point = new BMap.Point(116.349, 39.943); // 西直门坐标
+        map.centerAndZoom(point, 12);
+        map.enableScrollWheelZoom(true);
+
+        // 二环路线关键点坐标（顺时针，已根据真实二环路线修正）
+        var routePoints = [
+            {name: "西直门", lat: 39.9434, lng: 116.3490, type: "start"},
+            {name: "德胜门", lat: 39.9478, lng: 116.3745, type: "checkpoint"},
+            {name: "安定门", lat: 39.9478, lng: 116.4070, type: "checkpoint"},
+            {name: "东直门", lat: 39.9380, lng: 116.4340, type: "checkpoint"},
+            {name: "朝阳门", lat: 39.9270, lng: 116.4340, type: "checkpoint"},
+            {name: "建国门", lat: 39.9080, lng: 116.4340, type: "checkpoint"},
+            {name: "东便门", lat: 39.8950, lng: 116.4340, type: "checkpoint"},
+            {name: "广渠门", lat: 39.8830, lng: 116.4340, type: "checkpoint"},
+            {name: "左安门", lat: 39.8700, lng: 116.4340, type: "checkpoint"},
+            {name: "永定门", lat: 39.8630, lng: 116.3950, type: "checkpoint"},
+            {name: "右安门", lat: 39.8630, lng: 116.3560, type: "checkpoint"},
+            {name: "广安门", lat: 39.8830, lng: 116.3300, type: "checkpoint"},
+            {name: "西便门", lat: 39.8950, lng: 116.3300, type: "checkpoint"},
+            {name: "复兴门", lat: 39.9080, lng: 116.3300, type: "checkpoint"},
+            {name: "阜成门", lat: 39.9270, lng: 116.3300, type: "checkpoint"},
+            {name: "西直门", lat: 39.9434, lng: 116.3490, type: "end"}
+        ];
+
+        // 易错关键点位置
+        var warningPoints = [
+            {
+                name: "①东便门桥", 
+                lat: 39.895, 
+                lng: 116.434, 
+                warning: "从建国门向南到东便门，过桥后尽早下到护城河河堤的绿道！路边有下行台阶，注意观察。"
+            },
+            {
+                name: "②广渠门桥", 
+                lat: 39.883, 
+                lng: 116.434, 
+                warning: "从东便门沿绿道向南，继续保持在护城河河堤绿道上跑！过广渠门桥后继续沿绿道向南。"
+            },
+            {
+                name: "③永定门-右安门段", 
+                lat: 39.863, 
+                lng: 116.375, 
+                warning: "这段有护城河绿道，尽量跑河堤绿道，风景好且避开车流！"
+            },
+            {
+                name: "④天宁寺桥", 
+                lat: 39.895, 
+                lng: 116.330, 
+                warning: "从右安门、广安门向北，继续在护城河绿道上跑。绿道到天宁寺桥结束，完全越过桥后第一个上行台阶上马路继续向北。"
+            },
+            {
+                name: "⑤复兴门", 
+                lat: 39.908, 
+                lng: 116.330, 
+                warning: "走桥下的自行车道，不要上桥！保持在内环（东侧）跑。"
+            }
+        ];
+
+        // 公厕位置
+        var toilets = [
+            {name: "西直门桥区公厕", lat: 39.943, lng: 116.350, address: "西直门桥东北角"},
+            {name: "德胜门箭楼公厕", lat: 39.948, lng: 116.373, address: "德胜门箭楼西侧"},
+            {name: "安定门地铁站公厕", lat: 39.948, lng: 116.408, address: "安定门地铁站A口附近"},
+            {name: "东直门桥区公厕", lat: 39.938, lng: 116.433, address: "东直门桥西南角"},
+            {name: "朝阳门地铁站公厕", lat: 39.927, lng: 116.433, address: "朝阳门地铁站C口附近"},
+            {name: "建国门桥区公厕", lat: 39.908, lng: 116.435, address: "建国门桥东北角"},
+            {name: "明城墙遗址公园公厕", lat: 39.895, lng: 116.433, address: "明城墙遗址公园内"},
+            {name: "龙潭湖公园公厕", lat: 39.883, lng: 116.433, address: "龙潭湖公园北门"},
+            {name: "永定门公园公厕", lat: 39.863, lng: 116.395, address: "永定门公园内"},
+            {name: "陶然亭公园公厕", lat: 39.863, lng: 116.357, address: "陶然亭公园北门"},
+            {name: "广安门桥区公厕", lat: 39.883, lng: 116.331, address: "广安门桥西北角"},
+            {name: "复兴门地铁站公厕", lat: 39.908, lng: 116.331, address: "复兴门地铁站B口附近"},
+            {name: "阜成门地铁站公厕", lat: 39.927, lng: 116.331, address: "阜成门地铁站A口附近"}
+        ];
+
+        // 绘制路线
+        var polylinePoints = [];
+        routePoints.forEach(function(point) {
+            polylinePoints.push(new BMap.Point(point.lng, point.lat));
+        });
+
+        var polyline = new BMap.Polyline(polylinePoints, {
+            strokeColor: "#667eea",
+            strokeWeight: 4,
+            strokeOpacity: 0.8
+        });
+        map.addOverlay(polyline);
+
+        // 添加关键节点标记
+        routePoints.forEach(function(point, index) {
+            var pt = new BMap.Point(point.lng, point.lat);
+            var icon, label;
+            
+            if (point.type === "start" || point.type === "end") {
+                icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='40'%3E%3Cpath d='M15,0 C6.7,0 0,6.7 0,15 C0,26.2 15,40 15,40 S30,26.2 30,15 C30,6.7 23.3,0 15,0 Z' fill='%2328a745'/%3E%3Ccircle cx='15' cy='15' r='8' fill='white'/%3E%3C/svg%3E", new BMap.Size(30, 40));
+                label = new BMap.Label(point.name, {offset: new BMap.Size(0, -45)});
+                label.setStyle({
+                    color: "#28a745",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    border: "none",
+                    backgroundColor: "white",
+                    padding: "5px 10px",
+                    borderRadius: "4px",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+                });
+            } else {
+                icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32'%3E%3Cpath d='M12,0 C5.4,0 0,5.4 0,12 C0,21 12,32 12,32 S24,21 24,12 C24,5.4 18.6,0 12,0 Z' fill='%23dc3545'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E", new BMap.Size(24, 32));
+                label = new BMap.Label(point.name, {offset: new BMap.Size(0, -38)});
+                label.setStyle({
+                    color: "#dc3545",
+                    fontSize: "12px",
+                    border: "none",
+                    backgroundColor: "white",
+                    padding: "3px 8px",
+                    borderRadius: "3px",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.2)"
+                });
+            }
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            marker.setLabel(label);
+            map.addOverlay(marker);
+        });
+
+        // 添加易错点标记（特别醒目）
+        warningPoints.forEach(function(point) {
+            var pt = new BMap.Point(point.lng, point.lat);
+            var icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%23ff6b6b'/%3E%3Ctext x='16' y='20' text-anchor='middle' font-size='18' font-weight='bold' fill='white'%3E⚠%3C/text%3E%3C/svg%3E", new BMap.Size(32, 42));
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            
+            var label = new BMap.Label(point.name, {offset: new BMap.Size(0, -48)});
+            label.setStyle({
+                color: "#ff6b6b",
+                fontSize: "13px",
+                fontWeight: "bold",
+                border: "2px solid #ff6b6b",
+                backgroundColor: "white",
+                padding: "4px 10px",
+                borderRadius: "4px",
+                boxShadow: "0 2px 8px rgba(255,107,107,0.4)"
+            });
+            marker.setLabel(label);
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#ff6b6b;font-size:15px;'>" + point.name + " - 易错点</h4>" +
+                "<p style='margin:0;color:#333;font-size:14px;line-height:1.6;'><strong>⚠️ 注意：</strong>" + point.warning + "</p>" +
+                "</div>",
+                {width: 320}
+            );
+            
+            marker.addEventListener("click", function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            // 添加闪烁动画效果
+            marker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                marker.setAnimation(null);
+            }, 3000);
+            
+            map.addOverlay(marker);
+        });
+
+        // 添加公厕标记
+        toilets.forEach(function(toilet) {
+            var pt = new BMap.Point(toilet.lng, toilet.lat);
+            var icon = new BMap.Icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32'%3E%3Cpath d='M12,0 C5.4,0 0,5.4 0,12 C0,21 12,32 12,32 S24,21 24,12 C24,5.4 18.6,0 12,0 Z' fill='%23ffc107'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='14' fill='white'%3E🚻%3C/text%3E%3C/svg%3E", new BMap.Size(24, 32));
+            
+            var marker = new BMap.Marker(pt, {icon: icon});
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:#333;'>" + toilet.name + "</h4>" +
+                "<p style='margin:0;color:#666;font-size:13px;'>" + toilet.address + "</p>" +
+                "</div>",
+                {width: 250}
+            );
+            
+            marker.addEventListener("click", function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            map.addOverlay(marker);
+        });
+
+        // 添加距离标尺
+        var distanceControl = new BMap.ScaleControl({anchor: BMAP_ANCHOR_BOTTOM_LEFT});
+        map.addControl(distanceControl);
+
+        // 添加缩放控件
+        var navigationControl = new BMap.NavigationControl({anchor: BMAP_ANCHOR_TOP_RIGHT});
+        map.addControl(navigationControl);
+
+        // ========== 地点搜索功能 ==========
+        var searchMarker = null; // 保存搜索结果的标记
+        var localSearch = new BMap.LocalSearch(map, {
+            onSearchComplete: function(results) {
+                var resultsPanel = document.getElementById('searchResults');
+                resultsPanel.innerHTML = '';
+                
+                if (localSearch.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var resultsHtml = '';
+                    var resultsCount = Math.min(results.getCurrentNumPois(), 5); // 最多显示5个结果
+                    
+                    for (var i = 0; i < resultsCount; i++) {
+                        var poi = results.getPoi(i);
+                        resultsHtml += '<div class="search-result-item" data-index="' + i + '">' +
+                            '<div class="search-result-title">' + poi.title + '</div>' +
+                            '<div class="search-result-address">' + poi.address + '</div>' +
+                            '</div>';
+                    }
+                    
+                    resultsPanel.innerHTML = resultsHtml;
+                    resultsPanel.style.display = 'block';
+                    
+                    // 为每个搜索结果添加点击事件
+                    var resultItems = resultsPanel.getElementsByClassName('search-result-item');
+                    for (var i = 0; i < resultItems.length; i++) {
+                        resultItems[i].addEventListener('click', function() {
+                            var index = parseInt(this.getAttribute('data-index'));
+                            var poi = results.getPoi(index);
+                            showSearchResult(poi);
+                            resultsPanel.style.display = 'none';
+                        });
+                    }
+                } else {
+                    resultsPanel.innerHTML = '<div class="search-result-item">未找到相关地点，请尝试其他关键词</div>';
+                    resultsPanel.style.display = 'block';
+                }
+            }
+        });
+
+        // 显示搜索结果
+        function showSearchResult(poi) {
+            // 移除之前的搜索标记
+            if (searchMarker) {
+                map.removeOverlay(searchMarker);
+            }
+            
+            // 创建新的搜索标记
+            var point = poi.point;
+            var icon = new BMap.Icon(
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%2300bcd4'/%3E%3Ccircle cx='16' cy='16' r='8' fill='white'/%3E%3C/svg%3E",
+                new BMap.Size(32, 42)
+            );
+            
+            searchMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(searchMarker);
+            
+            // 创建信息窗口
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#00bcd4;font-size:16px;'>" + poi.title + "</h4>" +
+                "<p style='margin:0 0 8px 0;color:#666;font-size:14px;'><strong>地址：</strong>" + poi.address + "</p>" +
+                (poi.phoneNumber ? "<p style='margin:0;color:#666;font-size:14px;'><strong>电话：</strong>" + poi.phoneNumber + "</p>" : "") +
+                "</div>",
+                {width: 320}
+            );
+            
+            searchMarker.openInfoWindow(infoWindow);
+            
+            // 移动地图中心到搜索结果，并调整缩放级别
+            map.centerAndZoom(point, 15);
+            
+            // 添加动画效果
+            searchMarker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                searchMarker.setAnimation(null);
+            }, 2000);
+        }
+
+        // 搜索按钮点击事件
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            var keyword = document.getElementById('searchInput').value.trim();
+            if (keyword) {
+                localSearch.search(keyword);
+            } else {
+                alert('请输入搜索关键词');
+            }
+        });
+
+        // 搜索框回车事件
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('searchBtn').click();
+            }
+        });
+
+        // 点击地图其他地方隐藏搜索结果面板
+        map.addEventListener('click', function() {
+            document.getElementById('searchResults').style.display = 'none';
+        });
+
+        // 点击搜索结果面板外部隐藏面板
+        document.addEventListener('click', function(e) {
+            var resultsPanel = document.getElementById('searchResults');
+            var searchContainer = document.querySelector('.map-search-container');
+            if (!resultsPanel.contains(e.target) && !searchContainer.contains(e.target)) {
+                resultsPanel.style.display = 'none';
+            }
+        });
+
+        // ========== 多人位置共享功能 ==========
+        var isSharing = false; // 是否正在共享位置
+        var myUserId = null; // 当前用户ID
+        var myNickname = null; // 当前用户昵称
+        var otherUsersMarkers = {}; // 其他用户的标记 {userId: {marker, circle, label}}
+        var userColors = {}; // 用户颜色映射
+        var availableColors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+        ];
+        var colorIndex = 0;
+
+        // 生成唯一用户ID
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 获取用户颜色
+        function getUserColor(userId) {
+            if (!userColors[userId]) {
+                userColors[userId] = availableColors[colorIndex % availableColors.length];
+                colorIndex++;
+            }
+            return userColors[userId];
+        }
+
+        // 创建其他用户的定位图标
+        function createOtherUserIcon(color, heading) {
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3Cpath d='M 18 6 L 22 14 L 18 12 L 14 14 Z' fill='white' transform='rotate(" + heading + " 18 18)'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            } else {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='" + encodeURIComponent(color) + "' opacity='0.3'/%3E%3Ccircle cx='18' cy='18' r='10' fill='" + encodeURIComponent(color) + "'/%3E%3Ccircle cx='18' cy='18' r='5' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(36, 36),
+                    {anchor: new BMap.Size(18, 18)}
+                );
+            }
+        }
+
+        // 更新在线用户列表
+        function updateOnlineUsersList(users) {
+            var userList = document.getElementById('userList');
+            var userCount = document.getElementById('userCount');
+            var onlineUsersDiv = document.getElementById('onlineUsers');
+            
+            var count = 0;
+            var html = '';
+            
+            for (var userId in users) {
+                if (userId === myUserId) continue; // 跳过自己
+                
+                var user = users[userId];
+                var color = getUserColor(userId);
+                count++;
+                
+                // 计算距离
+                var distance = '';
+                if (lastPosition && user.lat && user.lng) {
+                    var userPoint = new BMap.Point(user.lng, user.lat);
+                    var myPoint = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                    var dist = map.getDistance(userPoint, myPoint);
+                    if (dist < 1000) {
+                        distance = Math.round(dist) + 'm';
+                    } else {
+                        distance = (dist / 1000).toFixed(1) + 'km';
+                    }
+                }
+                
+                html += '<div class="user-item">' +
+                    '<div class="user-color" style="background: ' + color + ';"></div>' +
+                    '<div class="user-name">' + (user.nickname || '匿名用户') + '</div>' +
+                    (distance ? '<div class="user-distance">' + distance + '</div>' : '') +
+                    '</div>';
+            }
+            
+            userCount.textContent = count;
+            userList.innerHTML = html || '<div style="text-align:center;color:#999;padding:10px;">暂无其他用户在线</div>';
+            onlineUsersDiv.style.display = isSharing ? 'block' : 'none';
+        }
+
+        // 更新其他用户的地图标记
+        function updateOtherUserMarker(userId, userData) {
+            if (userId === myUserId) return; // 不显示自己
+            
+            var point = new BMap.Point(userData.lng, userData.lat);
+            var color = getUserColor(userId);
+            
+            // 移除旧标记
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                if (otherUsersMarkers[userId].label) {
+                    map.removeOverlay(otherUsersMarkers[userId].label);
+                }
+            }
+            
+            // 创建新标记
+            var icon = createOtherUserIcon(color, userData.heading);
+            var marker = new BMap.Marker(point, {icon: icon});
+            
+            // 创建精度圈
+            var circle = new BMap.Circle(point, userData.accuracy || 50, {
+                strokeColor: color,
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                fillColor: color,
+                fillOpacity: 0.1
+            });
+            
+            // 创建标签
+            var label = new BMap.Label(userData.nickname || '匿名', {
+                offset: new BMap.Size(0, -40)
+            });
+            label.setStyle({
+                color: color,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                border: 'none',
+                backgroundColor: 'white',
+                padding: '3px 8px',
+                borderRadius: '3px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+            });
+            
+            marker.setLabel(label);
+            
+            // 添加信息窗口
+            var speedKmh = userData.speed ? (userData.speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:" + color + ";'>👤 " + (userData.nickname || '匿名用户') + "</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (userData.heading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(userData.heading) + "°</p>" : "") +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#999;'>更新：" + new Date(userData.timestamp).toLocaleTimeString() + "</p>" +
+                "</div>",
+                {width: 200}
+            );
+            
+            marker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+            
+            map.addOverlay(marker);
+            map.addOverlay(circle);
+            
+            otherUsersMarkers[userId] = {marker: marker, circle: circle, label: label};
+        }
+
+        // 移除用户标记
+        function removeUserMarker(userId) {
+            if (otherUsersMarkers[userId]) {
+                if (otherUsersMarkers[userId].marker) {
+                    map.removeOverlay(otherUsersMarkers[userId].marker);
+                }
+                if (otherUsersMarkers[userId].circle) {
+                    map.removeOverlay(otherUsersMarkers[userId].circle);
+                }
+                delete otherUsersMarkers[userId];
+            }
+        }
+
+        // 开始共享位置
+        function startSharing() {
+            if (!isFirebaseEnabled) {
+                alert('❌ Firebase 未配置，无法使用多人共享功能。\n\n请按照 FIREBASE_SETUP.md 中的说明配置 Firebase。');
+                return;
+            }
+            
+            var nickname = document.getElementById('nicknameInput').value.trim();
+            if (!nickname) {
+                alert('请输入你的昵称');
+                document.getElementById('nicknameInput').focus();
+                return;
+            }
+            
+            myUserId = generateUserId();
+            myNickname = nickname;
+            isSharing = true;
+            
+            // 更新按钮状态
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🔴 停止共享';
+            shareBtn.classList.add('active');
+            document.getElementById('nicknameInput').disabled = true;
+            
+            // 监听其他用户
+            database.ref('users').on('value', function(snapshot) {
+                var users = snapshot.val() || {};
+                updateOnlineUsersList(users);
+                
+                // 更新地图标记
+                for (var userId in users) {
+                    updateOtherUserMarker(userId, users[userId]);
+                }
+                
+                // 移除已离线用户的标记
+                for (var userId in otherUsersMarkers) {
+                    if (!users[userId]) {
+                        removeUserMarker(userId);
+                    }
+                }
+            });
+            
+            // 监听用户离线
+            database.ref('users/' + myUserId).onDisconnect().remove();
+            
+            // 开始定位
+            if (!isTracking) {
+                document.getElementById('locationBtn').click();
+            }
+        }
+
+        // 停止共享位置
+        function stopSharing() {
+            if (!isFirebaseEnabled || !myUserId) return;
+            
+            isSharing = false;
+            
+            // 从数据库移除自己
+            database.ref('users/' + myUserId).remove();
+            database.ref('users').off();
+            
+            // 清除所有其他用户标记
+            for (var userId in otherUsersMarkers) {
+                removeUserMarker(userId);
+            }
+            otherUsersMarkers = {};
+            
+            // 更新按钮状态
+            var shareBtn = document.getElementById('shareBtn');
+            shareBtn.textContent = '🌐 开始共享位置';
+            shareBtn.classList.remove('active');
+            document.getElementById('nicknameInput').disabled = false;
+            document.getElementById('onlineUsers').style.display = 'none';
+            
+            myUserId = null;
+            myNickname = null;
+        }
+
+        // 更新自己的位置到 Firebase
+        function updateMyLocationToFirebase(lat, lng, accuracy, speed, heading) {
+            if (!isSharing || !myUserId || !isFirebaseEnabled) return;
+            
+            database.ref('users/' + myUserId).set({
+                nickname: myNickname,
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy,
+                speed: speed || 0,
+                heading: heading || 0,
+                timestamp: Date.now()
+            });
+        }
+
+        // Firebase 连接状态监听
+        if (isFirebaseEnabled) {
+            database.ref('.info/connected').on('value', function(snapshot) {
+                var statusDiv = document.getElementById('firebaseStatus');
+                if (snapshot.val() === true) {
+                    statusDiv.textContent = '✅ 服务器已连接';
+                    statusDiv.className = 'firebase-status connected';
+                } else {
+                    statusDiv.textContent = '❌ 服务器连接断开';
+                    statusDiv.className = 'firebase-status error';
+                }
+            });
+        } else {
+            var statusDiv = document.getElementById('firebaseStatus');
+            statusDiv.textContent = '⚠️ Firebase 未配置，请查看 FIREBASE_SETUP.md';
+            statusDiv.className = 'firebase-status error';
+        }
+
+        // 共享按钮点击事件
+        document.getElementById('shareBtn').addEventListener('click', function() {
+            if (isSharing) {
+                stopSharing();
+            } else {
+                startSharing();
+            }
+        });
+
+        // ========== 实时定位功能 ==========
+        var locationMarker = null; // 当前位置标记
+        var locationCircle = null; // 位置精度圈
+        var directionArrow = null; // 方向箭头
+        var watchId = null; // 定位监听ID
+        var isTracking = false; // 是否正在追踪
+        var lastPosition = null; // 上一次的位置
+        var currentHeading = 0; // 当前方向角度
+
+        // 创建自定义定位图标（带方向箭头）
+        function createLocationIcon(heading) {
+            // 如果有方向信息，创建带箭头的图标
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3Cpath d='M 20 8 L 24 16 L 20 14 L 16 16 Z' fill='white' transform='rotate(" + heading + " 20 20)'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            } else {
+                // 没有方向信息，使用普通圆点
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            }
+        }
+
+        // 计算两点之间的方向角度（返回0-360度，0度为正北）
+        function calculateHeading(lat1, lng1, lat2, lng2) {
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var lat1Rad = lat1 * Math.PI / 180;
+            var lat2Rad = lat2 * Math.PI / 180;
+            
+            var y = Math.sin(dLng) * Math.cos(lat2Rad);
+            var x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+            
+            var heading = Math.atan2(y, x) * 180 / Math.PI;
+            return (heading + 360) % 360; // 转换为0-360度
+        }
+
+        // 计算到最近路线点的距离
+        function calculateDistanceToRoute(lat, lng) {
+            var userPoint = new BMap.Point(lng, lat);
+            var minDistance = Infinity;
+            var nearestPoint = null;
+
+            routePoints.forEach(function(point) {
+                var routePoint = new BMap.Point(point.lng, point.lat);
+                var distance = map.getDistance(userPoint, routePoint);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPoint = point;
+                }
+            });
+
+            return {
+                distance: Math.round(minDistance),
+                nearestPoint: nearestPoint
+            };
+        }
+
+        // 更新位置信息显示
+        function updateLocationInfo(position, accuracy, routeInfo, speed, heading) {
+            var infoPanel = document.getElementById('locationInfo');
+            var distanceText = routeInfo.distance < 1000 
+                ? routeInfo.distance + '米' 
+                : (routeInfo.distance / 1000).toFixed(2) + '公里';
+            
+            var statusEmoji = routeInfo.distance < 100 ? '✅' : routeInfo.distance < 500 ? '⚠️' : '❌';
+            var statusText = routeInfo.distance < 100 
+                ? '在路线上' 
+                : routeInfo.distance < 500 
+                ? '接近路线' 
+                : '偏离路线';
+
+            // 计算配速（分钟/公里）
+            var paceText = '';
+            if (speed && speed > 0.5) { // 速度大于0.5 m/s (1.8 km/h) 才显示配速
+                var kmPerHour = speed * 3.6; // 转换为公里/小时
+                var minPerKm = 60 / kmPerHour; // 分钟/公里
+                var paceMin = Math.floor(minPerKm);
+                var paceSec = Math.round((minPerKm - paceMin) * 60);
+                paceText = '<br>🏃 配速：' + paceMin + '\'' + (paceSec < 10 ? '0' : '') + paceSec + '"/km';
+            }
+
+            // 方向文字
+            var directionText = '';
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                var directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+                var index = Math.round(heading / 45) % 8;
+                directionText = '<br>🧭 方向：' + directions[index] + ' (' + Math.round(heading) + '°)';
+            }
+
+            infoPanel.innerHTML = 
+                '<strong>' + statusEmoji + ' ' + statusText + '</strong><br>' +
+                '📍 最近节点：' + routeInfo.nearestPoint.name + '<br>' +
+                '📏 距离路线：' + distanceText +
+                paceText +
+                directionText +
+                '<br><span class="location-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>';
+            infoPanel.classList.add('show');
+        }
+
+        // 定位成功回调
+        function onLocationSuccess(position) {
+            var lat = position.coords.latitude;
+            var lng = position.coords.longitude;
+            var accuracy = position.coords.accuracy;
+            var speed = position.coords.speed; // 速度（米/秒）
+            var heading = position.coords.heading; // 设备指南针方向
+
+            var point = new BMap.Point(lng, lat);
+
+            // 计算移动方向（如果有上一次位置）
+            if (lastPosition && speed && speed > 0.5) { // 速度大于0.5m/s才计算方向
+                var calculatedHeading = calculateHeading(
+                    lastPosition.lat, 
+                    lastPosition.lng, 
+                    lat, 
+                    lng
+                );
+                // 优先使用计算出的方向，如果设备没有提供heading
+                currentHeading = heading !== null && heading !== undefined && !isNaN(heading) 
+                    ? heading 
+                    : calculatedHeading;
+            } else if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                currentHeading = heading;
+            }
+
+            // 保存当前位置供下次使用
+            lastPosition = {lat: lat, lng: lng};
+
+            // 移除旧标记
+            if (locationMarker) {
+                map.removeOverlay(locationMarker);
+            }
+            if (locationCircle) {
+                map.removeOverlay(locationCircle);
+            }
+
+            // 创建新的位置标记（带方向）
+            var icon = createLocationIcon(currentHeading);
+            locationMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(locationMarker);
+
+            // 创建精度圈
+            locationCircle = new BMap.Circle(point, accuracy, {
+                strokeColor: '#4285f4',
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                fillColor: '#4285f4',
+                fillOpacity: 0.1
+            });
+            map.addOverlay(locationCircle);
+
+            // 计算到路线的距离
+            var routeInfo = calculateDistanceToRoute(lat, lng);
+
+            // 更新信息显示
+            updateLocationInfo(position, accuracy, routeInfo, speed, currentHeading);
+
+            // 同步位置到 Firebase（如果正在共享）
+            updateMyLocationToFirebase(lat, lng, accuracy, speed, currentHeading);
+
+            // 移动时地图跟随（平滑移动）
+            if (isTracking) {
+                map.panTo(point);
+            } else {
+                // 首次定位时移动地图中心
+                map.centerAndZoom(point, 16);
+            }
+
+            // 添加信息窗口
+            var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:#4285f4;'>📍 当前位置</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>纬度：" + lat.toFixed(6) + "</p>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>经度：" + lng.toFixed(6) + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (currentHeading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(currentHeading) + "°</p>" : "") +
+                "</div>",
+                {width: 250}
+            );
+
+            locationMarker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+        }
+
+        // 定位失败回调
+        function onLocationError(error) {
+            var errorMsg = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = '❌ 定位失败：用户拒绝了定位请求';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = '❌ 定位失败：位置信息不可用';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = '❌ 定位失败：请求超时';
+                    break;
+                default:
+                    errorMsg = '❌ 定位失败：未知错误';
+            }
+            
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.innerHTML = '<strong>' + errorMsg + '</strong><br>' +
+                '<span class="location-accuracy">请确保已允许浏览器访问位置信息</span>';
+            infoPanel.classList.add('show');
+
+            // 停止追踪
+            stopTracking();
+        }
+
+        // 开始追踪
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能');
+                return;
+            }
+
+            isTracking = true;
+            var locationBtn = document.getElementById('locationBtn');
+            locationBtn.classList.add('active');
+            locationBtn.innerHTML = '🔴 停止定位';
+
+            // 使用 watchPosition 实现实时追踪
+            watchId = navigator.geolocation.watchPosition(
+                onLocationSuccess,
+                onLocationError,
+                {
+                    enableHighAccuracy: true, // 高精度模式
+                    timeout: 10000, // 10秒超时
+                    maximumAge: 0 // 不使用缓存位置
+                }
+            );
+        }
+
+        // 停止追踪
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+
+            isTracking = false;
+            lastPosition = null; // 重置上次位置
+            currentHeading = 0; // 重置方向
+            
+            var locationBtn = document.getElementById('locationBtn');
+            locationBtn.classList.remove('active');
+            locationBtn.innerHTML = '📍 定位';
+
+            // 移除位置标记
+            if (locationMarker) {
+                map.removeOverlay(locationMarker);
+                locationMarker = null;
+            }
+            if (locationCircle) {
+                map.removeOverlay(locationCircle);
+                locationCircle = null;
+            }
+
+            // 隐藏信息面板
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.classList.remove('show');
+        }
+
+        // 定位按钮点击事件
+        document.getElementById('locationBtn').addEventListener('click', function() {
+            if (isTracking) {
+                stopTracking();
+            } else {
+                startTracking();
+            }
+        });
+
+        // 页面卸载时停止追踪
+        window.addEventListener('beforeunload', function() {
+            if (isTracking) {
+                stopTracking();
+            }
+        });
+    </script>
+</body>
+</html>
