@@ -1821,7 +1821,14 @@
 
         function stopTracking() {
             if (watchId !== null) {
-                clearInterval(watchId);
+                // 清除定时器或 watchPosition
+                if (navigator.geolocation) {
+                    navigator.geolocation.clearWatch(watchId);
+                    console.log('⏹️ 已停止 watchPosition');
+                } else {
+                    clearInterval(watchId);
+                    console.log('⏹️ 已停止定时轮询');
+                }
                 watchId = null;
             }
 
