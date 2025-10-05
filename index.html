@@ -215,6 +215,30 @@
         .location-btn.active {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
         }
+        .follow-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .follow-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+        }
+        .follow-btn:active {
+            transform: translateY(0);
+        }
+        .follow-btn.active {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
         .location-info {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             border-left: 4px solid #2196f3;
@@ -491,6 +515,7 @@
                 <input type="text" id="searchInput" class="map-search-input" placeholder="搜索地点（如：德州市政府、德州学院等）" />
                 <button id="searchBtn" class="map-search-btn">🔍 搜索</button>
                 <button id="locationBtn" class="location-btn">📍 定位</button>
+                <button id="followBtn" class="follow-btn">🎯 自动跟随</button>
             </div>
             <div id="locationInfo" class="location-info"></div>
             <div id="searchResults" class="search-result-panel"></div>
@@ -1408,6 +1433,7 @@
         var locationCircle = null;
         var watchId = null;
         var isTracking = false;
+        var isFollowing = false; // 是否自动跟随位置
         var lastPosition = null;
         var currentHeading = 0;
         var geolocation = null; // 百度地图定位对象
@@ -1702,9 +1728,11 @@
             updateLocationInfo({coords: {latitude: lat, longitude: lng}}, accuracy, routeInfo, speed, currentHeading, locationType);
             updateMyLocationToFirebase(lat, lng, accuracy, speed, currentHeading);
 
-            if (isTracking) {
+            // 只有在自动跟随模式下才移动地图视角
+            if (isFollowing) {
                 map.panTo(point);
-            } else {
+            } else if (!isTracking) {
+                // 首次定位时居中显示
                 map.centerAndZoom(point, 16);
             }
 
@@ -1775,11 +1803,17 @@
             }
 
             isTracking = true;
+            isFollowing = true; // 开始定位时默认开启自动跟随
             positionHistory = []; // 清空历史记录
             
             var locationBtn = document.getElementById('locationBtn');
             locationBtn.classList.add('active');
             locationBtn.innerHTML = '🔴 停止定位';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.add('active');
+            followBtn.innerHTML = '🎯 跟随中';
+            followBtn.disabled = false;
 
             console.log('🎯 开始定位追踪...');
             startLocationUpdates();
@@ -1792,6 +1826,7 @@
             }
 
             isTracking = false;
+            isFollowing = false;
             lastPosition = null;
             currentHeading = 0;
             positionHistory = [];
@@ -1799,6 +1834,11 @@
             var locationBtn = document.getElementById('locationBtn');
             locationBtn.classList.remove('active');
             locationBtn.innerHTML = '📍 定位';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.remove('active');
+            followBtn.innerHTML = '🎯 自动跟随';
+            followBtn.disabled = true;
 
             if (locationMarker) {
                 map.removeOverlay(locationMarker);
@@ -1815,6 +1855,30 @@
             console.log('⏹️ 定位追踪已停止');
         }
 
+        function toggleFollow() {
+            if (!isTracking) {
+                return; // 如果没有开启定位，不允许切换跟随模式
+            }
+
+            isFollowing = !isFollowing;
+            var followBtn = document.getElementById('followBtn');
+            
+            if (isFollowing) {
+                followBtn.classList.add('active');
+                followBtn.innerHTML = '🎯 跟随中';
+                // 立即移动到当前位置
+                if (lastPosition) {
+                    var point = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                    map.panTo(point);
+                }
+                console.log('✅ 自动跟随已开启');
+            } else {
+                followBtn.classList.remove('active');
+                followBtn.innerHTML = '🗺️ 自由浏览';
+                console.log('⏸️ 自动跟随已关闭，可以自由浏览地图');
+            }
+        }
+
         document.getElementById('locationBtn').addEventListener('click', function() {
             if (isTracking) {
                 stopTracking();
@@ -1823,11 +1887,18 @@
             }
         });
 
+        document.getElementById('followBtn').addEventListener('click', function() {
+            toggleFollow();
+        });
+
         window.addEventListener('beforeunload', function() {
             if (isTracking) {
                 stopTracking();
             }
         });
+
+        // 初始化时禁用跟随按钮
+        document.getElementById('followBtn').disabled = true;
     </script>
 </body>
 </html>
