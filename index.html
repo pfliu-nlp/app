@@ -1230,12 +1230,16 @@
             var icon = createOtherUserIcon(color, userData.heading);
             var marker = new BMap.Marker(point, {icon: icon});
             
-            var circle = new BMap.Circle(point, userData.accuracy || 50, {
-                strokeColor: color,
-                strokeWeight: 1,
-                strokeOpacity: 0.3,
-                fillColor: color,
-                fillOpacity: 0.1
+            // 根据定位质量调整圆圈样式
+            var accuracy = userData.accuracy || 50;
+            var quality = assessLocationQuality(accuracy);
+            
+            var circle = new BMap.Circle(point, accuracy, {
+                strokeColor: quality.color,
+                strokeWeight: 2,
+                strokeOpacity: 0.4,
+                fillColor: quality.color,
+                fillOpacity: 0.15
             });
             
             var label = new BMap.Label(userData.nickname || '匿名', {
@@ -1255,14 +1259,20 @@
             marker.setLabel(label);
             
             var speedKmh = userData.speed ? (userData.speed * 3.6).toFixed(1) : '0.0';
+            var locationType = userData.locationType || '未知';
+            var qualityText = userData.quality || quality.text;
+            
             var infoWindow = new BMap.InfoWindow(
                 "<div style='padding:10px;'>" +
                 "<h4 style='margin:0 0 8px 0;color:" + color + ";'>👤 " + (userData.nickname || '匿名用户') + "</h4>" +
                 "<p style='margin:0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
                 (userData.heading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(userData.heading) + "°</p>" : "") +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米 " + quality.emoji + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:" + quality.color + ";'><strong>定位质量：" + qualityText + "</strong></p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>定位方式：" + locationType + "</p>" +
                 "<p style='margin:4px 0 0 0;font-size:13px;color:#999;'>更新：" + new Date(userData.timestamp).toLocaleTimeString() + "</p>" +
                 "</div>",
-                {width: 200}
+                {width: 250}
             );
             
             marker.addEventListener('click', function() {
@@ -1393,13 +1403,79 @@
             }
         });
 
-        // ========== 实时定位功能 ==========
+        // ========== 实时定位功能（增强版）==========
         var locationMarker = null;
         var locationCircle = null;
         var watchId = null;
         var isTracking = false;
         var lastPosition = null;
         var currentHeading = 0;
+        var geolocation = null; // 百度地图定位对象
+        var positionHistory = []; // 位置历史记录，用于平滑处理
+        var maxHistorySize = 5; // 保留最近5个位置用于平滑
+        var lastUpdateTime = 0; // 上次更新时间
+        var minUpdateInterval = 1000; // 最小更新间隔（毫秒）
+
+        // 初始化百度地图定位服务
+        function initBaiduGeolocation() {
+            geolocation = new BMap.Geolocation();
+            console.log('✅ 百度地图定位服务已初始化');
+        }
+
+        // 位置平滑算法 - 使用加权平均
+        function smoothPosition(newLat, newLng, accuracy) {
+            // 如果精度太差（>100米），权重降低
+            var weight = accuracy > 100 ? 0.3 : (accuracy > 50 ? 0.5 : 0.7);
+            
+            positionHistory.push({
+                lat: newLat,
+                lng: newLng,
+                accuracy: accuracy,
+                weight: weight,
+                timestamp: Date.now()
+            });
+
+            // 只保留最近的N个位置
+            if (positionHistory.length > maxHistorySize) {
+                positionHistory.shift();
+            }
+
+            // 如果历史记录少于2个，直接返回当前位置
+            if (positionHistory.length < 2) {
+                return {lat: newLat, lng: newLng};
+            }
+
+            // 计算加权平均
+            var totalWeight = 0;
+            var weightedLat = 0;
+            var weightedLng = 0;
+
+            positionHistory.forEach(function(pos) {
+                weightedLat += pos.lat * pos.weight;
+                weightedLng += pos.lng * pos.weight;
+                totalWeight += pos.weight;
+            });
+
+            return {
+                lat: weightedLat / totalWeight,
+                lng: weightedLng / totalWeight
+            };
+        }
+
+        // 评估定位质量
+        function assessLocationQuality(accuracy) {
+            if (accuracy <= 10) {
+                return {level: 'excellent', text: '优秀', color: '#28a745', emoji: '🟢'};
+            } else if (accuracy <= 30) {
+                return {level: 'good', text: '良好', color: '#17a2b8', emoji: '🔵'};
+            } else if (accuracy <= 50) {
+                return {level: 'fair', text: '一般', color: '#ffc107', emoji: '🟡'};
+            } else if (accuracy <= 100) {
+                return {level: 'poor', text: '较差', color: '#fd7e14', emoji: '🟠'};
+            } else {
+                return {level: 'bad', text: '很差', color: '#dc3545', emoji: '🔴'};
+            }
+        }
 
         function createLocationIcon(heading) {
             if (heading !== null && heading !== undefined && !isNaN(heading)) {
@@ -1450,7 +1526,7 @@
             };
         }
 
-        function updateLocationInfo(position, accuracy, routeInfo, speed, heading) {
+        function updateLocationInfo(position, accuracy, routeInfo, speed, heading, locationType) {
             var infoPanel = document.getElementById('locationInfo');
             var distanceText = routeInfo.distance < 1000 
                 ? routeInfo.distance + '米' 
@@ -1479,25 +1555,110 @@
                 directionText = '<br>🧭 方向：' + directions[index] + ' (' + Math.round(heading) + '°)';
             }
 
+            // 定位质量评估
+            var quality = assessLocationQuality(accuracy);
+            var qualityText = '<br>' + quality.emoji + ' 定位质量：' + quality.text;
+
+            // 定位类型说明
+            var typeText = locationType ? '<br>📡 定位方式：' + locationType : '';
+
             infoPanel.innerHTML = 
                 '<strong>' + statusEmoji + ' ' + statusText + '</strong><br>' +
                 '📍 最近节点：' + routeInfo.nearestPoint.name + '<br>' +
                 '📏 距离路线：' + distanceText +
                 paceText +
                 directionText +
+                qualityText +
+                typeText +
                 '<br><span class="location-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>';
             infoPanel.classList.add('show');
         }
 
-        function onLocationSuccess(position) {
-            var lat = position.coords.latitude;
-            var lng = position.coords.longitude;
-            var accuracy = position.coords.accuracy;
-            var speed = position.coords.speed;
-            var heading = position.coords.heading;
+        // 使用百度地图定位（优先）
+        function getBaiduLocation() {
+            if (!geolocation) {
+                initBaiduGeolocation();
+            }
+
+            geolocation.getCurrentPosition(function(r) {
+                if (this.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var lat = r.point.lat;
+                    var lng = r.point.lng;
+                    var accuracy = r.accuracy || 50; // 百度定位精度
+                    
+                    // 定位类型
+                    var locationType = '百度定位';
+                    if (r.locationType) {
+                        switch(r.locationType) {
+                            case 1: locationType = 'GPS定位'; break;
+                            case 2: locationType = 'WiFi定位'; break;
+                            case 3: locationType = '基站定位'; break;
+                            case 4: locationType = 'IP定位'; break;
+                            default: locationType = '混合定位';
+                        }
+                    }
+
+                    console.log('✅ 百度定位成功:', locationType, '精度:', accuracy + 'm');
+                    
+                    // 应用位置平滑
+                    var smoothed = smoothPosition(lat, lng, accuracy);
+                    
+                    processLocationUpdate(smoothed.lat, smoothed.lng, accuracy, null, null, locationType);
+                } else {
+                    console.warn('⚠️ 百度定位失败，切换到浏览器定位');
+                    // 百度定位失败，使用浏览器定位
+                    useBrowserGeolocation();
+                }
+            }, {enableHighAccuracy: true});
+        }
+
+        // 使用浏览器原生定位（备用）
+        function useBrowserGeolocation() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能');
+                stopTracking();
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    var accuracy = position.coords.accuracy;
+                    var speed = position.coords.speed;
+                    var heading = position.coords.heading;
+
+                    console.log('✅ 浏览器定位成功, 精度:', accuracy + 'm');
+
+                    // 应用位置平滑
+                    var smoothed = smoothPosition(lat, lng, accuracy);
+                    
+                    processLocationUpdate(smoothed.lat, smoothed.lng, accuracy, speed, heading, 'GPS定位');
+                },
+                function(error) {
+                    onLocationError(error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // 处理定位更新（统一处理函数）
+        function processLocationUpdate(lat, lng, accuracy, speed, heading, locationType) {
+            var now = Date.now();
+            
+            // 限制更新频率，避免过于频繁的更新
+            if (now - lastUpdateTime < minUpdateInterval) {
+                return;
+            }
+            lastUpdateTime = now;
 
             var point = new BMap.Point(lng, lat);
 
+            // 计算方向
             if (lastPosition && speed && speed > 0.5) {
                 var calculatedHeading = calculateHeading(
                     lastPosition.lat, 
@@ -1514,6 +1675,7 @@
 
             lastPosition = {lat: lat, lng: lng};
 
+            // 更新地图标记
             if (locationMarker) {
                 map.removeOverlay(locationMarker);
             }
@@ -1525,17 +1687,19 @@
             locationMarker = new BMap.Marker(point, {icon: icon});
             map.addOverlay(locationMarker);
 
+            // 定位质量评估，调整圆圈颜色
+            var quality = assessLocationQuality(accuracy);
             locationCircle = new BMap.Circle(point, accuracy, {
-                strokeColor: '#4285f4',
-                strokeWeight: 1,
-                strokeOpacity: 0.3,
-                fillColor: '#4285f4',
-                fillOpacity: 0.1
+                strokeColor: quality.color,
+                strokeWeight: 2,
+                strokeOpacity: 0.5,
+                fillColor: quality.color,
+                fillOpacity: 0.15
             });
             map.addOverlay(locationCircle);
 
             var routeInfo = calculateDistanceToRoute(lat, lng);
-            updateLocationInfo(position, accuracy, routeInfo, speed, currentHeading);
+            updateLocationInfo({coords: {latitude: lat, longitude: lng}}, accuracy, routeInfo, speed, currentHeading, locationType);
             updateMyLocationToFirebase(lat, lng, accuracy, speed, currentHeading);
 
             if (isTracking) {
@@ -1544,17 +1708,22 @@
                 map.centerAndZoom(point, 16);
             }
 
+            // 更新信息窗口
             var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            var quality = assessLocationQuality(accuracy);
+            
             var infoWindow = new BMap.InfoWindow(
                 "<div style='padding:10px;'>" +
                 "<h4 style='margin:0 0 8px 0;color:#4285f4;'>📍 当前位置</h4>" +
                 "<p style='margin:0;font-size:13px;color:#666;'>纬度：" + lat.toFixed(6) + "</p>" +
                 "<p style='margin:0;font-size:13px;color:#666;'>经度：" + lng.toFixed(6) + "</p>" +
-                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米 " + quality.emoji + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:" + quality.color + ";'><strong>定位质量：" + quality.text + "</strong></p>" +
+                (locationType ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>定位方式：" + locationType + "</p>" : "") +
                 "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
                 (currentHeading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(currentHeading) + "°</p>" : "") +
                 "</div>",
-                {width: 250}
+                {width: 280}
             );
 
             locationMarker.addEventListener('click', function() {
@@ -1580,43 +1749,52 @@
             
             var infoPanel = document.getElementById('locationInfo');
             infoPanel.innerHTML = '<strong>' + errorMsg + '</strong><br>' +
-                '<span class="location-accuracy">请确保已允许浏览器访问位置信息</span>';
+                '<span class="location-accuracy">请确保已允许浏览器访问位置信息，并开启GPS</span>';
             infoPanel.classList.add('show');
 
-            stopTracking();
+            console.error('定位错误:', error);
+        }
+
+        // 定时更新定位
+        function startLocationUpdates() {
+            // 首次立即获取位置
+            getBaiduLocation();
+            
+            // 每3秒更新一次位置
+            watchId = setInterval(function() {
+                if (isTracking) {
+                    getBaiduLocation();
+                }
+            }, 3000);
         }
 
         function startTracking() {
-            if (!navigator.geolocation) {
+            if (!navigator.geolocation && !geolocation) {
                 alert('您的浏览器不支持地理定位功能');
                 return;
             }
 
             isTracking = true;
+            positionHistory = []; // 清空历史记录
+            
             var locationBtn = document.getElementById('locationBtn');
             locationBtn.classList.add('active');
             locationBtn.innerHTML = '🔴 停止定位';
 
-            watchId = navigator.geolocation.watchPosition(
-                onLocationSuccess,
-                onLocationError,
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
+            console.log('🎯 开始定位追踪...');
+            startLocationUpdates();
         }
 
         function stopTracking() {
             if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
+                clearInterval(watchId);
                 watchId = null;
             }
 
             isTracking = false;
             lastPosition = null;
             currentHeading = 0;
+            positionHistory = [];
             
             var locationBtn = document.getElementById('locationBtn');
             locationBtn.classList.remove('active');
@@ -1633,6 +1811,8 @@
 
             var infoPanel = document.getElementById('locationInfo');
             infoPanel.classList.remove('show');
+
+            console.log('⏹️ 定位追踪已停止');
         }
 
         document.getElementById('locationBtn').addEventListener('click', function() {
