@@ -219,8 +219,7 @@
                 <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
             </div>
             <div class="control-row">
-                <button id="locationBtn" class="btn btn-success">📍 GPS定位</button>
-                <button id="baiduLocationBtn" class="btn btn-success">🗺️ 百度定位</button>
+                <button id="baiduLocationBtn" class="btn btn-success">📍 开始定位</button>
                 <button id="followBtn" class="btn btn-info" disabled>🎯 自动跟随</button>
                 <button id="clearBtn" class="btn btn-primary">🗑️ 清除标记</button>
             </div>
@@ -269,7 +268,6 @@
         var locationMarker = null;
         var locationCircle = null;
         var accuracyCircle = null;
-        var watchId = null;
         var isTracking = false;
         var isFollowing = false;
         var lastPosition = null;
@@ -398,27 +396,6 @@
         }
 
         // ========== 定位功能 ==========
-        // 坐标转换：将GPS坐标转换为百度坐标
-        var convertor = new BMap.Convertor();
-        var pointsToConvert = [];
-        var convertQueue = [];
-
-        function convertCoordinate(lat, lng, callback) {
-            var point = new BMap.Point(lng, lat);
-            pointsToConvert = [point];
-            
-            convertor.translate(pointsToConvert, COORDINATES_WGS84, COORDINATES_BD09, function(data) {
-                if (data.status === 0) {
-                    var convertedPoint = data.points[0];
-                    console.log('🔄 坐标转换成功 - 原始:', lng.toFixed(6), lat.toFixed(6), '-> 百度:', convertedPoint.lng.toFixed(6), convertedPoint.lat.toFixed(6));
-                    callback(convertedPoint.lat, convertedPoint.lng);
-                } else {
-                    console.warn('⚠️ 坐标转换失败，使用原始坐标');
-                    callback(lat, lng);
-                }
-            });
-        }
-
         function processLocationUpdate(lat, lng, accuracy, speed, heading, locationType) {
             console.log('📍 位置更新 - 纬度:', lat.toFixed(6), '经度:', lng.toFixed(6), '精度:', accuracy + 'm', '定位方式:', locationType || 'GPS');
 
@@ -543,76 +520,6 @@
             console.error('定位错误:', error);
         }
 
-        function startTracking() {
-            if (!navigator.geolocation) {
-                alert('您的浏览器不支持地理定位功能');
-                return;
-            }
-
-            isTracking = true;
-            isFollowing = true;
-            
-            var locationBtn = document.getElementById('locationBtn');
-            locationBtn.classList.add('active');
-            locationBtn.innerHTML = '🔴 停止定位';
-
-            var followBtn = document.getElementById('followBtn');
-            followBtn.classList.add('active');
-            followBtn.innerHTML = '🎯 跟随中';
-            followBtn.disabled = false;
-
-            console.log('🎯 开始定位追踪...');
-            console.log('🔧 使用高精度GPS定位模式');
-
-            // 使用浏览器原生GPS定位（高精度模式）
-            watchId = navigator.geolocation.watchPosition(
-                function(position) {
-                    var rawLat = position.coords.latitude;
-                    var rawLng = position.coords.longitude;
-                    var accuracy = position.coords.accuracy;
-                    var speed = position.coords.speed;
-                    var heading = position.coords.heading;
-
-                    console.log('🛰️ GPS原始坐标 - 纬度:', rawLat.toFixed(6), '经度:', rawLng.toFixed(6), '精度:', accuracy + 'm');
-
-                    // 将GPS坐标（WGS84）转换为百度坐标（BD09）
-                    convertCoordinate(rawLat, rawLng, function(convertedLat, convertedLng) {
-                        processLocationUpdate(convertedLat, convertedLng, accuracy, speed, heading, 'GPS高精度');
-                    });
-                },
-                onLocationError,
-                {
-                    enableHighAccuracy: true,      // 启用高精度模式
-                    timeout: 27000,                // 27秒超时
-                    maximumAge: 0                  // 不使用缓存，每次都获取最新位置
-                }
-            );
-        }
-
-        function stopTracking() {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-
-            isTracking = false;
-            isFollowing = false;
-            
-            var locationBtn = document.getElementById('locationBtn');
-            locationBtn.classList.remove('active');
-            locationBtn.innerHTML = '📍 GPS定位';
-
-            var followBtn = document.getElementById('followBtn');
-            followBtn.classList.remove('active');
-            followBtn.innerHTML = '🎯 自动跟随';
-            followBtn.disabled = true;
-
-            var infoPanel = document.getElementById('locationInfo');
-            infoPanel.classList.remove('show');
-
-            console.log('⏹️ GPS定位已停止');
-        }
-
         function toggleFollow() {
             if (!isTracking) {
                 return;
@@ -731,7 +638,7 @@
             
             var baiduBtn = document.getElementById('baiduLocationBtn');
             baiduBtn.classList.add('active');
-            baiduBtn.innerHTML = '🔴 停止定位';
+            baiduBtn.innerHTML = '🔴 停止';
 
             var followBtn = document.getElementById('followBtn');
             followBtn.classList.add('active');
@@ -775,7 +682,7 @@
             
             var baiduBtn = document.getElementById('baiduLocationBtn');
             baiduBtn.classList.remove('active');
-            baiduBtn.innerHTML = '🗺️ 百度定位';
+            baiduBtn.innerHTML = '📍 开始定位';
 
             var followBtn = document.getElementById('followBtn');
             followBtn.classList.remove('active');
@@ -789,25 +696,7 @@
         }
 
         // ========== 事件监听 ==========
-        document.getElementById('locationBtn').addEventListener('click', function() {
-            // 如果百度定位正在运行，先停止它
-            if (baiduLocationInterval) {
-                stopBaiduTracking();
-            }
-            
-            if (isTracking && watchId) {
-                stopTracking();
-            } else {
-                startTracking();
-            }
-        });
-
         document.getElementById('baiduLocationBtn').addEventListener('click', function() {
-            // 如果GPS定位正在运行，先停止它
-            if (watchId) {
-                stopTracking();
-            }
-            
             if (isTracking && baiduLocationInterval) {
                 stopBaiduTracking();
             } else {
@@ -855,18 +744,12 @@
 
         // 页面关闭时停止定位
         window.addEventListener('beforeunload', function() {
-            if (watchId) {
-                stopTracking();
-            }
             if (baiduLocationInterval) {
                 stopBaiduTracking();
             }
         });
 
         console.log('✅ 地图导航系统初始化完成');
-        console.log('💡 提示：');
-        console.log('   - GPS定位：使用设备GPS，精度高但需要GPS信号');
-        console.log('   - 百度定位：使用网络定位，室内也可用但精度稍低');
     </script>
 </body>
 </html>
