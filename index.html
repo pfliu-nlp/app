@@ -110,18 +110,51 @@
             cursor: not-allowed;
         }
         .info-panel {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-            border-left: 4px solid #2196f3;
-            padding: 12px 15px;
+            background: white;
             border-radius: 6px;
-            font-size: 14px;
+            border: 1px solid #e0e0e0;
+            margin-top: 10px;
             display: none;
+            overflow: hidden;
         }
         .info-panel.show {
             display: block;
         }
-        .info-panel strong {
+        .info-header {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .info-header:hover {
+            background: linear-gradient(135deg, #d1e7f8 0%, #a9d0ed 100%);
+        }
+        .info-header strong {
             color: #1976d2;
+            font-size: 14px;
+        }
+        .info-toggle {
+            font-size: 14px;
+            color: #1976d2;
+            transition: transform 0.3s;
+        }
+        .info-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .info-content {
+            padding: 12px 15px;
+            font-size: 14px;
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+        .info-content.collapsed {
+            max-height: 0;
+            padding: 0 15px;
         }
         .info-accuracy {
             font-size: 12px;
@@ -176,12 +209,47 @@
         .stats-panel {
             background: white;
             border-radius: 10px;
-            padding: 15px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             display: none;
+            overflow: hidden;
         }
         .stats-panel.show {
             display: block;
+        }
+        .stats-header {
+            padding: 12px 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .stats-header:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+        }
+        .stats-header h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .stats-toggle {
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        .stats-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .stats-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+        .stats-content.collapsed {
+            max-height: 0;
+            padding: 0 15px;
         }
         .stats-grid {
             display: grid;
@@ -228,30 +296,36 @@
         </div>
 
         <div class="stats-panel" id="statsPanel">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-label">更新次数</div>
-                    <div class="stat-value" id="updateCount">0</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">移动距离</div>
-                    <div class="stat-value" id="totalDistance">0 m</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">轨迹点数</div>
-                    <div class="stat-value" id="pointCount">0</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">当前速度</div>
-                    <div class="stat-value" id="currentSpeed">0 km/h</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">平均速度</div>
-                    <div class="stat-value" id="avgSpeed">0 km/h</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">定位精度</div>
-                    <div class="stat-value" id="accuracy">-- m</div>
+            <div class="stats-header" id="statsHeader">
+                <h3>📊 追踪统计</h3>
+                <span class="stats-toggle" id="statsToggle">▼</span>
+            </div>
+            <div class="stats-content" id="statsContent">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">更新次数</div>
+                        <div class="stat-value" id="updateCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">移动距离</div>
+                        <div class="stat-value" id="totalDistance">0 m</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">轨迹点数</div>
+                        <div class="stat-value" id="pointCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">当前速度</div>
+                        <div class="stat-value" id="currentSpeed">0 km/h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">平均速度</div>
+                        <div class="stat-value" id="avgSpeed">0 km/h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">定位精度</div>
+                        <div class="stat-value" id="accuracy">-- m</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -401,14 +475,22 @@
             var locationTypeText = locationType ? '<br>📡 定位方式：' + locationType : '';
 
             infoPanel.innerHTML = 
-                '<strong>📍 实时定位中</strong><br>' +
+                '<div class="info-header" id="infoHeader">' +
+                '<strong>📍 实时定位中</strong>' +
+                '<span class="info-toggle" id="infoToggle">▼</span>' +
+                '</div>' +
+                '<div class="info-content" id="infoContent">' +
                 '坐标：' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
                 '🏃 速度：' + speedKmh + ' km/h' +
                 directionText +
                 '<br>' + quality.emoji + ' 定位质量：' + quality.text +
                 locationTypeText +
-                '<span class="info-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>';
+                '<span class="info-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>' +
+                '</div>';
             infoPanel.classList.add('show');
+            
+            // 重新绑定折叠事件（因为innerHTML会重置）
+            setupInfoPanelToggle();
         }
 
         // ========== 定位功能 ==========
@@ -946,6 +1028,47 @@
                 resultsPanel.style.display = 'none';
             }
         });
+
+        // 统计面板折叠功能
+        var statsCollapsed = false;
+        document.getElementById('statsHeader').addEventListener('click', function() {
+            statsCollapsed = !statsCollapsed;
+            var statsContent = document.getElementById('statsContent');
+            var statsToggle = document.getElementById('statsToggle');
+            
+            if (statsCollapsed) {
+                statsContent.classList.add('collapsed');
+                statsToggle.classList.add('collapsed');
+                statsToggle.textContent = '▶';
+            } else {
+                statsContent.classList.remove('collapsed');
+                statsToggle.classList.remove('collapsed');
+                statsToggle.textContent = '▼';
+            }
+        });
+
+        // 定位信息面板折叠功能
+        var infoCollapsed = false;
+        function setupInfoPanelToggle() {
+            var infoHeader = document.getElementById('infoHeader');
+            if (infoHeader) {
+                infoHeader.onclick = function() {
+                    infoCollapsed = !infoCollapsed;
+                    var infoContent = document.getElementById('infoContent');
+                    var infoToggle = document.getElementById('infoToggle');
+                    
+                    if (infoCollapsed) {
+                        infoContent.classList.add('collapsed');
+                        infoToggle.classList.add('collapsed');
+                        infoToggle.textContent = '▶';
+                    } else {
+                        infoContent.classList.remove('collapsed');
+                        infoToggle.classList.remove('collapsed');
+                        infoToggle.textContent = '▼';
+                    }
+                };
+            }
+        }
 
         // 页面关闭时停止定位
         window.addEventListener('beforeunload', function() {
