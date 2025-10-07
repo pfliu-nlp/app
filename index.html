@@ -628,6 +628,154 @@
             }, 2000);
         }
 
+        // ========== 原生 GPS 定位（主要方案）==========
+        var nativeWatchId = null;
+
+        // WGS84 转 BD09 坐标转换
+        function wgs84ToBd09(lat, lng) {
+            var x_PI = 3.14159265358979324 * 3000.0 / 180.0;
+            var PI = 3.1415926535897932384626;
+            var a = 6378245.0;
+            var ee = 0.00669342162296594323;
+
+            function transformLat(lng, lat) {
+                var ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * PI) + 20.0 * Math.sin(2.0 * lng * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lat * PI) + 40.0 * Math.sin(lat / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (160.0 * Math.sin(lat / 12.0 * PI) + 320 * Math.sin(lat * PI / 30.0)) * 2.0 / 3.0;
+                return ret;
+            }
+
+            function transformLng(lng, lat) {
+                var ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * PI) + 20.0 * Math.sin(2.0 * lng * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lng * PI) + 40.0 * Math.sin(lng / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (150.0 * Math.sin(lng / 12.0 * PI) + 300.0 * Math.sin(lng / 30.0 * PI)) * 2.0 / 3.0;
+                return ret;
+            }
+
+            // WGS84 to GCJ02
+            var dlat = transformLat(lng - 105.0, lat - 35.0);
+            var dlng = transformLng(lng - 105.0, lat - 35.0);
+            var radlat = lat / 180.0 * PI;
+            var magic = Math.sin(radlat);
+            magic = 1 - ee * magic * magic;
+            var sqrtmagic = Math.sqrt(magic);
+            dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI);
+            dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI);
+            var gcjLat = lat + dlat;
+            var gcjLng = lng + dlng;
+
+            // GCJ02 to BD09
+            var z = Math.sqrt(gcjLng * gcjLng + gcjLat * gcjLat) + 0.00002 * Math.sin(gcjLat * x_PI);
+            var theta = Math.atan2(gcjLat, gcjLng) + 0.000003 * Math.cos(gcjLng * x_PI);
+            var bd09Lng = z * Math.cos(theta) + 0.0065;
+            var bd09Lat = z * Math.sin(theta) + 0.006;
+
+            return {lat: bd09Lat, lng: bd09Lng};
+        }
+
+        function startNativeTracking() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能，将使用百度定位');
+                console.error('❌ 浏览器不支持原生定位');
+                startBaiduTracking();
+                return;
+            }
+
+            isTracking = true;
+            isFollowing = true;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.add('active');
+            baiduBtn.innerHTML = '🔴 停止';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.add('active');
+            followBtn.innerHTML = '🎯 跟随中';
+            followBtn.disabled = false;
+
+            console.log('🎯 开始原生GPS定位追踪...');
+
+            nativeWatchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    var wgsLat = position.coords.latitude;
+                    var wgsLng = position.coords.longitude;
+                    var accuracy = position.coords.accuracy;
+                    var speed = position.coords.speed;
+                    var heading = position.coords.heading;
+
+                    // 转换为百度坐标系
+                    var bdCoords = wgs84ToBd09(wgsLat, wgsLng);
+
+                    console.log('📍 GPS定位成功 - WGS84:', wgsLat.toFixed(6), wgsLng.toFixed(6), 
+                               '-> BD09:', bdCoords.lat.toFixed(6), bdCoords.lng.toFixed(6), 
+                               '精度:', accuracy + 'm');
+
+                    processLocationUpdate(bdCoords.lat, bdCoords.lng, accuracy, speed, heading, 'GPS');
+                },
+                function(error) {
+                    var errorMsg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '❌ GPS定位失败：用户拒绝了定位请求，切换到百度定位';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = '❌ GPS定位失败：位置信息不可用，切换到百度定位';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '❌ GPS定位失败：请求超时，切换到百度定位';
+                            break;
+                        default:
+                            errorMsg = '❌ GPS定位失败：未知错误，切换到百度定位';
+                    }
+                    
+                    console.error(errorMsg, error);
+                    
+                    var infoPanel = document.getElementById('locationInfo');
+                    infoPanel.innerHTML = '<strong>' + errorMsg + '</strong>';
+                    infoPanel.classList.add('show');
+
+                    // 停止原生定位，切换到百度定位
+                    stopNativeTracking();
+                    setTimeout(function() {
+                        startBaiduTracking();
+                    }, 1000);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 27000,
+                    maximumAge: 0
+                }
+            );
+
+            console.log('⚙️ GPS配置: 高精度模式, 超时27s, 实时追踪');
+        }
+
+        function stopNativeTracking() {
+            if (nativeWatchId !== null) {
+                navigator.geolocation.clearWatch(nativeWatchId);
+                nativeWatchId = null;
+            }
+
+            isTracking = false;
+            isFollowing = false;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.remove('active');
+            baiduBtn.innerHTML = '📍 开始定位';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.remove('active');
+            followBtn.innerHTML = '🎯 自动跟随';
+            followBtn.disabled = true;
+
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.classList.remove('show');
+
+            console.log('⏹️ GPS定位已停止');
+        }
+
         // 百度地图定位（备用方案）
         var geolocation = new BMap.Geolocation();
         var baiduLocationInterval = null;
@@ -645,7 +793,7 @@
             followBtn.innerHTML = '🎯 跟随中';
             followBtn.disabled = false;
 
-            console.log('🗺️ 开始百度地图定位...');
+            console.log('🗺️ 开始百度地图定位（备用方案）...');
 
             function getBaiduLocation() {
                 geolocation.getCurrentPosition(function(r) {
@@ -697,10 +845,17 @@
 
         // ========== 事件监听 ==========
         document.getElementById('baiduLocationBtn').addEventListener('click', function() {
-            if (isTracking && baiduLocationInterval) {
-                stopBaiduTracking();
+            if (isTracking) {
+                // 停止所有定位
+                if (nativeWatchId !== null) {
+                    stopNativeTracking();
+                }
+                if (baiduLocationInterval !== null) {
+                    stopBaiduTracking();
+                }
             } else {
-                startBaiduTracking();
+                // 优先使用原生GPS定位
+                startNativeTracking();
             }
         });
 
@@ -744,6 +899,9 @@
 
         // 页面关闭时停止定位
         window.addEventListener('beforeunload', function() {
+            if (nativeWatchId !== null) {
+                stopNativeTracking();
+            }
             if (baiduLocationInterval) {
                 stopBaiduTracking();
             }
