@@ -514,18 +514,6 @@
                     totalDistance += movedDistance;
                     console.log('🚶 移动距离: ' + movedDistance.toFixed(1) + 'm, 累计: ' + totalDistance.toFixed(1) + 'm');
                 }
-                
-                // 添加到路径
-                pathPoints.push(point);
-                if (pathPolyline) {
-                    map.removeOverlay(pathPolyline);
-                }
-                pathPolyline = new BMap.Polyline(pathPoints, {
-                    strokeColor: "#667eea",
-                    strokeWeight: 4,
-                    strokeOpacity: 0.8
-                });
-                map.addOverlay(pathPolyline);
 
                 // 计算方向
                 if (movedDistance > 1) {
@@ -542,13 +530,31 @@
             } else {
                 // 首次定位
                 startTime = Date.now();
-                pathPoints = [point];
-                
-                // 添加起点标记（绿色圆圈）
+                console.log('🎯 首次定位，设置起点');
+            }
+
+            // 添加到轨迹点（每次都添加）
+            pathPoints.push(point);
+
+            // 更新轨迹线
+            if (pathPoints.length >= 2) {
+                if (pathPolyline) {
+                    map.removeOverlay(pathPolyline);
+                }
+                pathPolyline = new BMap.Polyline(pathPoints, {
+                    strokeColor: "#667eea",
+                    strokeWeight: 4,
+                    strokeOpacity: 0.8
+                });
+                map.addOverlay(pathPolyline);
+            }
+
+            // 在轨迹起点添加标记（当有第二个点时）
+            if (pathPoints.length === 2) {
                 if (startMarker) {
                     map.removeOverlay(startMarker);
                 }
-                startMarker = new BMap.Marker(point, {
+                startMarker = new BMap.Marker(pathPoints[0], {
                     icon: new BMap.Icon(
                         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%234CAF50'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E",
                         new BMap.Size(24, 24),
