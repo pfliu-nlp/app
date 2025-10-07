@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时定位轨迹追踪</title>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        #map {
+            width: 100%;
+            height: 70vh;
+        }
+        .controls {
+            padding: 15px;
+            background: white;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn.active {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .btn.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #2196f3;
+        }
+        .stat-card h3 {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .stat-card p {
+            font-size: 16px;
+            color: #333;
+            font-weight: bold;
+        }
+        .log {
+            margin-top: 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 4px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .log-entry.success { border-left-color: #28a745; }
+        .log-entry.error { border-left-color: #dc3545; }
+        .log-entry.warning { border-left-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="controls">
+        <div class="button-group">
+            <button id="startBtn" class="btn">🎯 开始追踪</button>
+            <button id="stopBtn" class="btn">⏹️ 停止追踪</button>
+            <button id="clearBtn" class="btn secondary">🗑️ 清除轨迹</button>
+            <button id="centerBtn" class="btn secondary">📍 回到当前位置</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>状态</h3>
+                <p id="status">未开始</p>
+            </div>
+            <div class="stat-card">
+                <h3>更新次数</h3>
+                <p id="updateCount">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>总距离</h3>
+                <p id="totalDistance">0 m</p>
+            </div>
+            <div class="stat-card">
+                <h3>当前速度</h3>
+                <p id="currentSpeed">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>精度</h3>
+                <p id="currentAccuracy">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>轨迹点数</h3>
+                <p id="pointCount">0</p>
+            </div>
+        </div>
+
+        <div class="log" id="logContainer">
+            <div class="log-entry">等待开始追踪...</div>
+        </div>
+    </div>
+
+    <script>
+        // 地图初始化
+        var map = new BMap.Map("map");
+        var defaultCenter = new BMap.Point(116.404, 39.915);
+        map.centerAndZoom(defaultCenter, 15);
+        map.enableScrollWheelZoom(true);
+
+        // 全局变量
+        var watchId = null;
+        var updateCount = 0;
+        var totalDistance = 0;
+        var pathPoints = [];
+        var lastPosition = null;
+        var currentMarker = null;
+        var accuracyCircle = null;
+        var polyline = null;
+        var isTracking = false;
+
+        // 添加日志
+        function addLog(message, type = 'info') {
+            var logContainer = document.getElementById('logContainer');
+            var entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            var timestamp = new Date().toLocaleTimeString();
+            entry.textContent = '[' + timestamp + '] ' + message;
+            logContainer.insertBefore(entry, logContainer.firstChild);
+        }
+
+        // 计算两点间距离（米）
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            var R = 6371000; // 地球半径（米）
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 格式化距离显示
+        function formatDistance(meters) {
+            if (meters < 1000) {
+                return meters.toFixed(1) + ' m';
+            } else {
+                return (meters / 1000).toFixed(2) + ' km';
+            }
+        }
+
+        // 更新地图上的位置标记
+        function updateMapMarker(lat, lng, accuracy) {
+            var point = new BMap.Point(lng, lat);
+
+            // 更新标记
+            if (currentMarker) {
+                map.removeOverlay(currentMarker);
+            }
+            currentMarker = new BMap.Marker(point);
+            map.addOverlay(currentMarker);
+
+            // 更新精度圈
+            if (accuracyCircle) {
+                map.removeOverlay(accuracyCircle);
+            }
+            accuracyCircle = new BMap.Circle(point, accuracy, {
+                strokeColor: "#4CAF50",
+                strokeWeight: 2,
+                strokeOpacity: 0.5,
+                fillColor: "#4CAF50",
+                fillOpacity: 0.2
+            });
+            map.addOverlay(accuracyCircle);
+
+            return point;
+        }
+
+        // 更新轨迹线
+        function updateTrackLine() {
+            if (pathPoints.length < 2) return;
+
+            if (polyline) {
+                map.removeOverlay(polyline);
+            }
+
+            polyline = new BMap.Polyline(pathPoints, {
+                strokeColor: "#FF6B6B",
+                strokeWeight: 4,
+                strokeOpacity: 0.8
+            });
+            map.addOverlay(polyline);
+
+            // 在轨迹起点添加标记
+            if (pathPoints.length === 2) {
+                var startMarker = new BMap.Marker(pathPoints[0], {
+                    icon: new BMap.Icon(
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IiM0Q0FGNTAiLz48L3N2Zz4=',
+                        new BMap.Size(24, 24)
+                    )
+                });
+                map.addOverlay(startMarker);
+            }
+        }
+
+        // 处理位置更新
+        function handlePositionUpdate(position) {
+            var lat = position.coords.latitude;
+            var lng = position.coords.longitude;
+            var accuracy = position.coords.accuracy;
+            var speed = position.coords.speed;
+            var heading = position.coords.heading;
+
+            updateCount++;
+
+            // 更新地图标记
+            var point = updateMapMarker(lat, lng, accuracy);
+            
+            // 添加到轨迹点
+            pathPoints.push(point);
+
+            // 计算移动距离
+            var distance = 0;
+            if (lastPosition) {
+                distance = calculateDistance(
+                    lastPosition.lat,
+                    lastPosition.lng,
+                    lat,
+                    lng
+                );
+                
+                // 只有移动距离大于精度的一半时才累加（减少GPS漂移影响）
+                if (distance > accuracy / 2) {
+                    totalDistance += distance;
+                }
+            }
+
+            // 更新轨迹线
+            updateTrackLine();
+
+            // 移动地图视角到当前位置
+            map.panTo(point);
+
+            // 更新统计信息
+            document.getElementById('updateCount').textContent = updateCount;
+            document.getElementById('totalDistance').textContent = formatDistance(totalDistance);
+            document.getElementById('pointCount').textContent = pathPoints.length;
+            document.getElementById('currentAccuracy').textContent = '±' + Math.round(accuracy) + 'm';
+            
+            if (speed !== null && speed !== undefined && speed > 0) {
+                document.getElementById('currentSpeed').textContent = (speed * 3.6).toFixed(1) + ' km/h';
+            } else {
+                document.getElementById('currentSpeed').textContent = '-';
+            }
+
+            // 添加日志
+            var message = '✅ #' + updateCount + ': ' +
+                lat.toFixed(6) + ', ' + lng.toFixed(6) +
+                ' (±' + Math.round(accuracy) + 'm)';
+            
+            if (distance > 0) {
+                message += ' | 移动: ' + distance.toFixed(1) + 'm';
+            }
+            
+            if (speed !== null && speed !== undefined && speed > 0) {
+                message += ' | 速度: ' + (speed * 3.6).toFixed(1) + 'km/h';
+            }
+
+            addLog(message, 'success');
+
+            lastPosition = {lat: lat, lng: lng};
+        }
+
+        // 处理定位错误
+        function handlePositionError(error) {
+            var errorMsg = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = '❌ 用户拒绝了定位请求';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = '❌ 位置信息不可用';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = '❌ 请求超时';
+                    break;
+                default:
+                    errorMsg = '❌ 未知错误: ' + error.message;
+            }
+            addLog(errorMsg, 'error');
+            document.getElementById('status').textContent = '定位失败';
+        }
+
+        // 开始追踪
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能');
+                addLog('❌ 浏览器不支持地理定位', 'error');
+                return;
+            }
+
+            if (isTracking) {
+                addLog('⚠️ 已在追踪中', 'warning');
+                return;
+            }
+
+            addLog('🎯 开始位置追踪...', 'success');
+            document.getElementById('status').textContent = '追踪中';
+            document.getElementById('startBtn').classList.add('active');
+            isTracking = true;
+
+            watchId = navigator.geolocation.watchPosition(
+                handlePositionUpdate,
+                handlePositionError,
+                {
+                    enableHighAccuracy: true,
+                    timeout: 27000,
+                    maximumAge: 0
+                }
+            );
+
+            addLog('⚙️ 配置: 高精度模式, 超时27s', 'info');
+        }
+
+        // 停止追踪
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                isTracking = false;
+                
+                addLog('⏹️ 追踪已停止。总距离: ' + formatDistance(totalDistance) + 
+                       ', 总点数: ' + pathPoints.length, 'warning');
+                
+                document.getElementById('status').textContent = '已停止';
+                document.getElementById('startBtn').classList.remove('active');
+            }
+        }
+
+        // 清除轨迹
+        function clearTrack() {
+            // 清除地图覆盖物
+            if (polyline) {
+                map.removeOverlay(polyline);
+                polyline = null;
+            }
+            if (currentMarker) {
+                map.removeOverlay(currentMarker);
+                currentMarker = null;
+            }
+            if (accuracyCircle) {
+                map.removeOverlay(accuracyCircle);
+                accuracyCircle = null;
+            }
+
+            // 清除所有覆盖物（包括起点标记）
+            map.clearOverlays();
+
+            // 重置数据
+            pathPoints = [];
+            totalDistance = 0;
+            updateCount = 0;
+            lastPosition = null;
+
+            // 重置显示
+            document.getElementById('updateCount').textContent = '0';
+            document.getElementById('totalDistance').textContent = '0 m';
+            document.getElementById('pointCount').textContent = '0';
+            document.getElementById('currentSpeed').textContent = '-';
+            document.getElementById('currentAccuracy').textContent = '-';
+
+            addLog('🗑️ 轨迹已清除', 'info');
+        }
+
+        // 回到当前位置
+        function centerToCurrentPosition() {
+            if (lastPosition) {
+                var point = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                map.panTo(point);
+                addLog('📍 已回到当前位置', 'info');
+            } else {
+                addLog('⚠️ 还没有位置信息', 'warning');
+            }
+        }
+
+        // 事件监听
+        document.getElementById('startBtn').addEventListener('click', startTracking);
+        document.getElementById('stopBtn').addEventListener('click', stopTracking);
+        document.getElementById('clearBtn').addEventListener('click', clearTrack);
+        document.getElementById('centerBtn').addEventListener('click', centerToCurrentPosition);
+
+        // 页面关闭时停止追踪
+        window.addEventListener('beforeunload', stopTracking);
+
+        // 初始化提示
+        addLog('💡 点击"开始追踪"按钮开始记录您的移动轨迹', 'info');
+        addLog('💡 红色线条显示您的移动路径，绿色圆圈表示定位精度', 'info');
+    </script>
+</body>
+</html>
