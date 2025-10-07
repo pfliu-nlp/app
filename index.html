@@ -230,8 +230,16 @@
         <div class="stats-panel" id="statsPanel">
             <div class="stats-grid">
                 <div class="stat-item">
+                    <div class="stat-label">更新次数</div>
+                    <div class="stat-value" id="updateCount">0</div>
+                </div>
+                <div class="stat-item">
                     <div class="stat-label">移动距离</div>
                     <div class="stat-value" id="totalDistance">0 m</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">轨迹点数</div>
+                    <div class="stat-value" id="pointCount">0</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-label">当前速度</div>
@@ -280,6 +288,8 @@
         var totalDistance = 0;
         var speedHistory = [];
         var startTime = null;
+        var updateCount = 0;
+        var startMarker = null;
 
         // ========== 工具函数 ==========
         function calculateDistance(lat1, lng1, lat2, lng2) {
@@ -342,11 +352,17 @@
                 statsPanel.classList.add('show');
             }
 
+            // 更新次数
+            document.getElementById('updateCount').textContent = updateCount;
+
             // 更新总距离
             var distanceText = totalDistance < 1000 
                 ? Math.round(totalDistance) + ' m' 
                 : (totalDistance / 1000).toFixed(2) + ' km';
             document.getElementById('totalDistance').textContent = distanceText;
+
+            // 更新轨迹点数
+            document.getElementById('pointCount').textContent = pathPoints.length;
 
             // 更新当前速度
             var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
@@ -397,28 +413,37 @@
 
         // ========== 定位功能 ==========
         function processLocationUpdate(lat, lng, accuracy, speed, heading, locationType) {
-            console.log('📍 位置更新 - 纬度:', lat.toFixed(6), '经度:', lng.toFixed(6), '精度:', accuracy + 'm', '定位方式:', locationType || 'GPS');
+            updateCount++;
+            
+            var logMsg = '📍 #' + updateCount + ' 位置更新 - ' + 
+                        lat.toFixed(6) + ', ' + lng.toFixed(6) + 
+                        ' (±' + Math.round(accuracy) + 'm) - ' + (locationType || 'GPS');
+            console.log(logMsg);
 
             var point = new BMap.Point(lng, lat);
 
             // 计算移动距离
+            var movedDistance = 0;
             if (lastPosition) {
-                var movedDistance = calculateDistance(lastPosition.lat, lastPosition.lng, lat, lng);
-                if (movedDistance > 1) { // 移动超过1米才累计
+                movedDistance = calculateDistance(lastPosition.lat, lastPosition.lng, lat, lng);
+                
+                // 只有移动距离大于精度的一半时才累加（减少GPS漂移影响）
+                if (movedDistance > accuracy / 2) {
                     totalDistance += movedDistance;
-                    
-                    // 添加到路径
-                    pathPoints.push(point);
-                    if (pathPolyline) {
-                        map.removeOverlay(pathPolyline);
-                    }
-                    pathPolyline = new BMap.Polyline(pathPoints, {
-                        strokeColor: "#667eea",
-                        strokeWeight: 4,
-                        strokeOpacity: 0.8
-                    });
-                    map.addOverlay(pathPolyline);
+                    console.log('🚶 移动距离: ' + movedDistance.toFixed(1) + 'm, 累计: ' + totalDistance.toFixed(1) + 'm');
                 }
+                
+                // 添加到路径
+                pathPoints.push(point);
+                if (pathPolyline) {
+                    map.removeOverlay(pathPolyline);
+                }
+                pathPolyline = new BMap.Polyline(pathPoints, {
+                    strokeColor: "#667eea",
+                    strokeWeight: 4,
+                    strokeOpacity: 0.8
+                });
+                map.addOverlay(pathPolyline);
 
                 // 计算方向
                 if (movedDistance > 1) {
@@ -436,6 +461,20 @@
                 // 首次定位
                 startTime = Date.now();
                 pathPoints = [point];
+                
+                // 添加起点标记（绿色圆圈）
+                if (startMarker) {
+                    map.removeOverlay(startMarker);
+                }
+                startMarker = new BMap.Marker(point, {
+                    icon: new BMap.Icon(
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%234CAF50'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E",
+                        new BMap.Size(24, 24),
+                        {anchor: new BMap.Size(12, 12)}
+                    )
+                });
+                map.addOverlay(startMarker);
+                console.log('🎯 起点已标记');
             }
 
             lastPosition = {lat: lat, lng: lng};
@@ -552,9 +591,14 @@
                 map.removeOverlay(pathPolyline);
                 pathPolyline = null;
             }
+            if (startMarker) {
+                map.removeOverlay(startMarker);
+                startMarker = null;
+            }
             pathPoints = [];
             totalDistance = 0;
             speedHistory = [];
+            updateCount = 0;
             updateStats(0, 0);
             console.log('🗑️ 已清除所有标记和路径');
         }
@@ -773,7 +817,10 @@
             var infoPanel = document.getElementById('locationInfo');
             infoPanel.classList.remove('show');
 
-            console.log('⏹️ GPS定位已停止');
+            var distanceText = totalDistance < 1000 
+                ? totalDistance.toFixed(1) + 'm' 
+                : (totalDistance / 1000).toFixed(2) + 'km';
+            console.log('⏹️ GPS定位已停止 - 总距离: ' + distanceText + ', 总点数: ' + pathPoints.length);
         }
 
         // 百度地图定位（备用方案）
@@ -840,7 +887,10 @@
             var infoPanel = document.getElementById('locationInfo');
             infoPanel.classList.remove('show');
 
-            console.log('⏹️ 百度定位已停止');
+            var distanceText = totalDistance < 1000 
+                ? totalDistance.toFixed(1) + 'm' 
+                : (totalDistance / 1000).toFixed(2) + 'km';
+            console.log('⏹️ 百度定位已停止 - 总距离: ' + distanceText + ', 总点数: ' + pathPoints.length);
         }
 
         // ========== 事件监听 ==========
