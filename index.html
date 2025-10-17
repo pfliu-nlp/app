@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易地图导航系统</title>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=19pC14ldf5XgThjPKscZQwIFfyV1ZYOQ"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            overflow: hidden;
+        }
+        .control-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .control-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .search-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn {
+            padding: 12px 24px;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .btn-success.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        }
+        .btn-info.active {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .info-panel {
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            margin-top: 10px;
+            display: none;
+            overflow: hidden;
+        }
+        .info-panel.show {
+            display: block;
+        }
+        .info-header {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .info-header:hover {
+            background: linear-gradient(135deg, #d1e7f8 0%, #a9d0ed 100%);
+        }
+        .info-header strong {
+            color: #1976d2;
+            font-size: 14px;
+        }
+        .info-toggle {
+            font-size: 14px;
+            color: #1976d2;
+            transition: transform 0.3s;
+        }
+        .info-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .info-content {
+            padding: 12px 15px;
+            font-size: 14px;
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+        .info-content.collapsed {
+            max-height: 0;
+            padding: 0 15px;
+        }
+        .info-accuracy {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            display: block;
+        }
+        .search-results {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            position: relative;
+            z-index: 100;
+        }
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .search-result-address {
+            font-size: 12px;
+            color: #666;
+        }
+        .map-container {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        .stats-panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: none;
+            overflow: hidden;
+        }
+        .stats-panel.show {
+            display: block;
+        }
+        .stats-header {
+            padding: 12px 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .stats-header:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+        }
+        .stats-header h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .stats-toggle {
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        .stats-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .stats-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+        .stats-content.collapsed {
+            max-height: 0;
+            padding: 0 15px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        .stat-item {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ 简易地图导航系统</h1>
+        <p>实时定位 | 位置跟踪 | 地点搜索</p>
+    </div>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="control-row">
+                <input type="text" id="searchInput" class="search-input" placeholder="搜索地点（如：天安门、北京大学等）" />
+                <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
+            </div>
+            <div class="control-row">
+                <button id="baiduLocationBtn" class="btn btn-success">📍 开始定位</button>
+                <button id="followBtn" class="btn btn-info" disabled>🎯 自动跟随</button>
+                <button id="clearBtn" class="btn btn-primary">🗑️ 清除标记</button>
+            </div>
+            <div id="searchResults" class="search-results"></div>
+            <div id="locationInfo" class="info-panel"></div>
+        </div>
+
+        <div class="stats-panel" id="statsPanel">
+            <div class="stats-header" id="statsHeader">
+                <h3>📊 追踪统计</h3>
+                <span class="stats-toggle" id="statsToggle">▼</span>
+            </div>
+            <div class="stats-content" id="statsContent">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">更新次数</div>
+                        <div class="stat-value" id="updateCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">移动距离</div>
+                        <div class="stat-value" id="totalDistance">0 m</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">轨迹点数</div>
+                        <div class="stat-value" id="pointCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">当前速度</div>
+                        <div class="stat-value" id="currentSpeed">0 km/h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">平均速度</div>
+                        <div class="stat-value" id="avgSpeed">0 km/h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">定位精度</div>
+                        <div class="stat-value" id="accuracy">-- m</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 地图初始化 ==========
+        var map = new BMap.Map("map");
+        var centerPoint = new BMap.Point(116.404, 39.915); // 北京天安门
+        map.centerAndZoom(centerPoint, 13);
+        map.enableScrollWheelZoom(true);
+
+        // 添加控件
+        map.addControl(new BMap.ScaleControl({anchor: BMAP_ANCHOR_BOTTOM_LEFT}));
+        map.addControl(new BMap.NavigationControl({anchor: BMAP_ANCHOR_TOP_RIGHT}));
+
+        // ========== 全局变量 ==========
+        var locationMarker = null;
+        var locationCircle = null;
+        var accuracyCircle = null;
+        var isTracking = false;
+        var isFollowing = false;
+        var lastPosition = null;
+        var currentHeading = 0;
+        var searchMarker = null;
+        var pathPolyline = null;
+        var pathPoints = [];
+
+        // 统计数据
+        var totalDistance = 0;
+        var speedHistory = [];
+        var startTime = null;
+        var updateCount = 0;
+        var startMarker = null;
+
+        // ========== 工具函数 ==========
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            var R = 6371000; // 地球半径（米）
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function calculateHeading(lat1, lng1, lat2, lng2) {
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var lat1Rad = lat1 * Math.PI / 180;
+            var lat2Rad = lat2 * Math.PI / 180;
+            
+            var y = Math.sin(dLng) * Math.cos(lat2Rad);
+            var x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+            
+            var heading = Math.atan2(y, x) * 180 / Math.PI;
+            return (heading + 360) % 360;
+        }
+
+        function assessLocationQuality(accuracy) {
+            if (accuracy <= 10) {
+                return {level: 'excellent', text: '优秀', color: '#28a745', emoji: '🟢'};
+            } else if (accuracy <= 30) {
+                return {level: 'good', text: '良好', color: '#17a2b8', emoji: '🔵'};
+            } else if (accuracy <= 50) {
+                return {level: 'fair', text: '一般', color: '#ffc107', emoji: '🟡'};
+            } else if (accuracy <= 100) {
+                return {level: 'poor', text: '较差', color: '#fd7e14', emoji: '🟠'};
+            } else {
+                return {level: 'bad', text: '很差', color: '#dc3545', emoji: '🔴'};
+            }
+        }
+
+        function createLocationIcon(heading) {
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3Cpath d='M 20 8 L 24 16 L 20 14 L 16 16 Z' fill='white' transform='rotate(" + heading + " 20 20)'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            } else {
+                return new BMap.Icon(
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234285f4;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%231a73e8;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='18' fill='%234285f4' opacity='0.2'/%3E%3Ccircle cx='20' cy='20' r='12' fill='url(%23grad)'/%3E%3Ccircle cx='20' cy='20' r='6' fill='white'/%3E%3C/svg%3E",
+                    new BMap.Size(40, 40),
+                    {anchor: new BMap.Size(20, 20)}
+                );
+            }
+        }
+
+        function updateStats(speed, accuracy) {
+            var statsPanel = document.getElementById('statsPanel');
+            if (isTracking) {
+                statsPanel.classList.add('show');
+            }
+
+            // 更新次数
+            document.getElementById('updateCount').textContent = updateCount;
+
+            // 更新总距离
+            var distanceText = totalDistance < 1000 
+                ? Math.round(totalDistance) + ' m' 
+                : (totalDistance / 1000).toFixed(2) + ' km';
+            document.getElementById('totalDistance').textContent = distanceText;
+
+            // 更新轨迹点数
+            document.getElementById('pointCount').textContent = pathPoints.length;
+
+            // 更新当前速度
+            var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            document.getElementById('currentSpeed').textContent = speedKmh + ' km/h';
+
+            // 更新平均速度
+            if (speed && speed > 0) {
+                speedHistory.push(speed);
+                if (speedHistory.length > 10) {
+                    speedHistory.shift();
+                }
+            }
+            var avgSpeed = 0;
+            if (speedHistory.length > 0) {
+                avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
+            }
+            document.getElementById('avgSpeed').textContent = (avgSpeed * 3.6).toFixed(1) + ' km/h';
+
+            // 更新精度
+            document.getElementById('accuracy').textContent = '±' + Math.round(accuracy) + ' m';
+        }
+
+        function updateLocationInfo(lat, lng, accuracy, speed, heading, locationType) {
+            var infoPanel = document.getElementById('locationInfo');
+            var quality = assessLocationQuality(accuracy);
+
+            var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            var directionText = '';
+            
+            if (heading !== null && heading !== undefined && !isNaN(heading)) {
+                var directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+                var index = Math.round(heading / 45) % 8;
+                directionText = '<br>🧭 方向：' + directions[index] + ' (' + Math.round(heading) + '°)';
+            }
+
+            var locationTypeText = locationType ? '<br>📡 定位方式：' + locationType : '';
+
+            infoPanel.innerHTML = 
+                '<div class="info-header" id="infoHeader">' +
+                '<strong>📍 实时定位中</strong>' +
+                '<span class="info-toggle" id="infoToggle">▼</span>' +
+                '</div>' +
+                '<div class="info-content" id="infoContent">' +
+                '坐标：' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
+                '🏃 速度：' + speedKmh + ' km/h' +
+                directionText +
+                '<br>' + quality.emoji + ' 定位质量：' + quality.text +
+                locationTypeText +
+                '<span class="info-accuracy">定位精度：±' + Math.round(accuracy) + '米</span>' +
+                '</div>';
+            infoPanel.classList.add('show');
+            
+            // 重新绑定折叠事件（因为innerHTML会重置）
+            setupInfoPanelToggle();
+        }
+
+        // ========== 定位功能 ==========
+        function processLocationUpdate(lat, lng, accuracy, speed, heading, locationType) {
+            updateCount++;
+            
+            var logMsg = '📍 #' + updateCount + ' 位置更新 - ' + 
+                        lat.toFixed(6) + ', ' + lng.toFixed(6) + 
+                        ' (±' + Math.round(accuracy) + 'm) - ' + (locationType || 'GPS');
+            console.log(logMsg);
+
+            var point = new BMap.Point(lng, lat);
+
+            // 计算移动距离
+            var movedDistance = 0;
+            if (lastPosition) {
+                movedDistance = calculateDistance(lastPosition.lat, lastPosition.lng, lat, lng);
+                
+                // 只有移动距离大于精度的一半时才累加（减少GPS漂移影响）
+                if (movedDistance > accuracy / 2) {
+                    totalDistance += movedDistance;
+                    console.log('🚶 移动距离: ' + movedDistance.toFixed(1) + 'm, 累计: ' + totalDistance.toFixed(1) + 'm');
+                }
+
+                // 计算方向
+                if (movedDistance > 1) {
+                    var calculatedHeading = calculateHeading(
+                        lastPosition.lat, 
+                        lastPosition.lng, 
+                        lat, 
+                        lng
+                    );
+                    currentHeading = heading !== null && heading !== undefined && !isNaN(heading) 
+                        ? heading 
+                        : calculatedHeading;
+                }
+            } else {
+                // 首次定位
+                startTime = Date.now();
+                console.log('🎯 首次定位，设置起点');
+            }
+
+            // 添加到轨迹点（每次都添加）
+            pathPoints.push(point);
+
+            // 更新轨迹线
+            if (pathPoints.length >= 2) {
+                if (pathPolyline) {
+                    map.removeOverlay(pathPolyline);
+                }
+                pathPolyline = new BMap.Polyline(pathPoints, {
+                    strokeColor: "#667eea",
+                    strokeWeight: 4,
+                    strokeOpacity: 0.8
+                });
+                map.addOverlay(pathPolyline);
+            }
+
+            // 在轨迹起点添加标记（当有第二个点时）
+            if (pathPoints.length === 2) {
+                if (startMarker) {
+                    map.removeOverlay(startMarker);
+                }
+                startMarker = new BMap.Marker(pathPoints[0], {
+                    icon: new BMap.Icon(
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%234CAF50'/%3E%3Ccircle cx='12' cy='12' r='6' fill='white'/%3E%3C/svg%3E",
+                        new BMap.Size(24, 24),
+                        {anchor: new BMap.Size(12, 12)}
+                    )
+                });
+                map.addOverlay(startMarker);
+                console.log('🎯 起点已标记');
+            }
+
+            lastPosition = {lat: lat, lng: lng};
+
+            // 更新地图标记
+            if (locationMarker) {
+                map.removeOverlay(locationMarker);
+            }
+            if (locationCircle) {
+                map.removeOverlay(locationCircle);
+            }
+
+            var icon = createLocationIcon(currentHeading);
+            locationMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(locationMarker);
+
+            // 定位质量评估，调整圆圈颜色
+            var quality = assessLocationQuality(accuracy);
+            locationCircle = new BMap.Circle(point, accuracy, {
+                strokeColor: quality.color,
+                strokeWeight: 2,
+                strokeOpacity: 0.5,
+                fillColor: quality.color,
+                fillOpacity: 0.15
+            });
+            map.addOverlay(locationCircle);
+
+            // 更新信息
+            updateLocationInfo(lat, lng, accuracy, speed, currentHeading, locationType);
+            updateStats(speed, accuracy);
+
+            // 自动跟随
+            if (isFollowing) {
+                map.panTo(point);
+            } else if (!lastPosition || pathPoints.length === 1) {
+                // 首次定位时居中
+                map.centerAndZoom(point, 16);
+            }
+
+            // 添加点击事件
+            var speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:10px;'>" +
+                "<h4 style='margin:0 0 8px 0;color:#4285f4;'>📍 当前位置</h4>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>纬度：" + lat.toFixed(6) + "</p>" +
+                "<p style='margin:0;font-size:13px;color:#666;'>经度：" + lng.toFixed(6) + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>精度：±" + Math.round(accuracy) + "米 " + quality.emoji + "</p>" +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:" + quality.color + ";'><strong>定位质量：" + quality.text + "</strong></p>" +
+                (locationType ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>定位方式：" + locationType + "</p>" : "") +
+                "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>速度：" + speedKmh + " km/h</p>" +
+                (currentHeading ? "<p style='margin:4px 0 0 0;font-size:13px;color:#666;'>方向：" + Math.round(currentHeading) + "°</p>" : "") +
+                "</div>",
+                {width: 280}
+            );
+
+            locationMarker.addEventListener('click', function() {
+                this.openInfoWindow(infoWindow);
+            });
+        }
+
+        function onLocationError(error) {
+            var errorMsg = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = '❌ 定位失败：用户拒绝了定位请求';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = '❌ 定位失败：位置信息不可用';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = '❌ 定位失败：请求超时';
+                    break;
+                default:
+                    errorMsg = '❌ 定位失败：未知错误';
+            }
+            
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.innerHTML = '<strong>' + errorMsg + '</strong><br>' +
+                '<span class="info-accuracy">请确保已允许浏览器访问位置信息，并开启GPS</span>';
+            infoPanel.classList.add('show');
+
+            console.error('定位错误:', error);
+        }
+
+        function toggleFollow() {
+            if (!isTracking) {
+                return;
+            }
+
+            isFollowing = !isFollowing;
+            var followBtn = document.getElementById('followBtn');
+            
+            if (isFollowing) {
+                followBtn.classList.add('active');
+                followBtn.innerHTML = '🎯 跟随中';
+                if (lastPosition) {
+                    var point = new BMap.Point(lastPosition.lng, lastPosition.lat);
+                    map.panTo(point);
+                }
+                console.log('✅ 自动跟随已开启');
+            } else {
+                followBtn.classList.remove('active');
+                followBtn.innerHTML = '🗺️ 自由浏览';
+                console.log('⏸️ 自动跟随已关闭');
+            }
+        }
+
+        function clearMarkers() {
+            if (searchMarker) {
+                map.removeOverlay(searchMarker);
+                searchMarker = null;
+            }
+            if (pathPolyline) {
+                map.removeOverlay(pathPolyline);
+                pathPolyline = null;
+            }
+            if (startMarker) {
+                map.removeOverlay(startMarker);
+                startMarker = null;
+            }
+            pathPoints = [];
+            totalDistance = 0;
+            speedHistory = [];
+            updateCount = 0;
+            updateStats(0, 0);
+            console.log('🗑️ 已清除所有标记和路径');
+        }
+
+        // ========== 搜索功能 ==========
+        var localSearch = new BMap.LocalSearch(map, {
+            onSearchComplete: function(results) {
+                var resultsPanel = document.getElementById('searchResults');
+                resultsPanel.innerHTML = '';
+                
+                if (localSearch.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var resultsHtml = '';
+                    var resultsCount = Math.min(results.getCurrentNumPois(), 5);
+                    
+                    for (var i = 0; i < resultsCount; i++) {
+                        var poi = results.getPoi(i);
+                        resultsHtml += '<div class="search-result-item" data-index="' + i + '">' +
+                            '<div class="search-result-title">' + poi.title + '</div>' +
+                            '<div class="search-result-address">' + poi.address + '</div>' +
+                            '</div>';
+                    }
+                    
+                    resultsPanel.innerHTML = resultsHtml;
+                    resultsPanel.style.display = 'block';
+                    
+                    var resultItems = resultsPanel.getElementsByClassName('search-result-item');
+                    for (var i = 0; i < resultItems.length; i++) {
+                        resultItems[i].addEventListener('click', function() {
+                            var index = parseInt(this.getAttribute('data-index'));
+                            var poi = results.getPoi(index);
+                            showSearchResult(poi);
+                            resultsPanel.style.display = 'none';
+                        });
+                    }
+                } else {
+                    resultsPanel.innerHTML = '<div class="search-result-item">未找到相关地点，请尝试其他关键词</div>';
+                    resultsPanel.style.display = 'block';
+                }
+            }
+        });
+
+        function showSearchResult(poi) {
+            if (searchMarker) {
+                map.removeOverlay(searchMarker);
+            }
+            
+            var point = poi.point;
+            var icon = new BMap.Icon(
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='42'%3E%3Cpath d='M16,0 C7.2,0 0,7.2 0,16 C0,28 16,42 16,42 S32,28 32,16 C32,7.2 24.8,0 16,0 Z' fill='%23667eea'/%3E%3Ccircle cx='16' cy='16' r='8' fill='white'/%3E%3C/svg%3E",
+                new BMap.Size(32, 42)
+            );
+            
+            searchMarker = new BMap.Marker(point, {icon: icon});
+            map.addOverlay(searchMarker);
+            
+            var infoWindow = new BMap.InfoWindow(
+                "<div style='padding:12px;max-width:300px;'>" +
+                "<h4 style='margin:0 0 10px 0;color:#667eea;font-size:16px;'>📍 " + poi.title + "</h4>" +
+                "<p style='margin:0 0 8px 0;color:#666;font-size:14px;'><strong>地址：</strong>" + poi.address + "</p>" +
+                (poi.phoneNumber ? "<p style='margin:0;color:#666;font-size:14px;'><strong>电话：</strong>" + poi.phoneNumber + "</p>" : "") +
+                "</div>",
+                {width: 320}
+            );
+            
+            searchMarker.openInfoWindow(infoWindow);
+            map.centerAndZoom(point, 15);
+            
+            searchMarker.setAnimation(BMAP_ANIMATION_BOUNCE);
+            setTimeout(function() {
+                searchMarker.setAnimation(null);
+            }, 2000);
+        }
+
+        // ========== 原生 GPS 定位（主要方案）==========
+        var nativeWatchId = null;
+
+        // WGS84 转 BD09 坐标转换
+        function wgs84ToBd09(lat, lng) {
+            var x_PI = 3.14159265358979324 * 3000.0 / 180.0;
+            var PI = 3.1415926535897932384626;
+            var a = 6378245.0;
+            var ee = 0.00669342162296594323;
+
+            function transformLat(lng, lat) {
+                var ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * PI) + 20.0 * Math.sin(2.0 * lng * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lat * PI) + 40.0 * Math.sin(lat / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (160.0 * Math.sin(lat / 12.0 * PI) + 320 * Math.sin(lat * PI / 30.0)) * 2.0 / 3.0;
+                return ret;
+            }
+
+            function transformLng(lng, lat) {
+                var ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * PI) + 20.0 * Math.sin(2.0 * lng * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lng * PI) + 40.0 * Math.sin(lng / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (150.0 * Math.sin(lng / 12.0 * PI) + 300.0 * Math.sin(lng / 30.0 * PI)) * 2.0 / 3.0;
+                return ret;
+            }
+
+            // WGS84 to GCJ02
+            var dlat = transformLat(lng - 105.0, lat - 35.0);
+            var dlng = transformLng(lng - 105.0, lat - 35.0);
+            var radlat = lat / 180.0 * PI;
+            var magic = Math.sin(radlat);
+            magic = 1 - ee * magic * magic;
+            var sqrtmagic = Math.sqrt(magic);
+            dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI);
+            dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI);
+            var gcjLat = lat + dlat;
+            var gcjLng = lng + dlng;
+
+            // GCJ02 to BD09
+            var z = Math.sqrt(gcjLng * gcjLng + gcjLat * gcjLat) + 0.00002 * Math.sin(gcjLat * x_PI);
+            var theta = Math.atan2(gcjLat, gcjLng) + 0.000003 * Math.cos(gcjLng * x_PI);
+            var bd09Lng = z * Math.cos(theta) + 0.0065;
+            var bd09Lat = z * Math.sin(theta) + 0.006;
+
+            return {lat: bd09Lat, lng: bd09Lng};
+        }
+
+        function startNativeTracking() {
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能，将使用百度定位');
+                console.error('❌ 浏览器不支持原生定位');
+                startBaiduTracking();
+                return;
+            }
+
+            isTracking = true;
+            isFollowing = true;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.add('active');
+            baiduBtn.innerHTML = '🔴 停止';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.add('active');
+            followBtn.innerHTML = '🎯 跟随中';
+            followBtn.disabled = false;
+
+            console.log('🎯 开始原生GPS定位追踪...');
+
+            nativeWatchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    var wgsLat = position.coords.latitude;
+                    var wgsLng = position.coords.longitude;
+                    var accuracy = position.coords.accuracy;
+                    var speed = position.coords.speed;
+                    var heading = position.coords.heading;
+
+                    // 转换为百度坐标系
+                    var bdCoords = wgs84ToBd09(wgsLat, wgsLng);
+
+                    console.log('📍 GPS定位成功 - WGS84:', wgsLat.toFixed(6), wgsLng.toFixed(6), 
+                               '-> BD09:', bdCoords.lat.toFixed(6), bdCoords.lng.toFixed(6), 
+                               '精度:', accuracy + 'm');
+
+                    processLocationUpdate(bdCoords.lat, bdCoords.lng, accuracy, speed, heading, 'GPS');
+                },
+                function(error) {
+                    var errorMsg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '❌ GPS定位失败：用户拒绝了定位请求，切换到百度定位';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = '❌ GPS定位失败：位置信息不可用，切换到百度定位';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '❌ GPS定位失败：请求超时，切换到百度定位';
+                            break;
+                        default:
+                            errorMsg = '❌ GPS定位失败：未知错误，切换到百度定位';
+                    }
+                    
+                    console.error(errorMsg, error);
+                    
+                    var infoPanel = document.getElementById('locationInfo');
+                    infoPanel.innerHTML = '<strong>' + errorMsg + '</strong>';
+                    infoPanel.classList.add('show');
+
+                    // 停止原生定位，切换到百度定位
+                    stopNativeTracking();
+                    setTimeout(function() {
+                        startBaiduTracking();
+                    }, 1000);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 27000,
+                    maximumAge: 0
+                }
+            );
+
+            console.log('⚙️ GPS配置: 高精度模式, 超时27s, 实时追踪');
+        }
+
+        function stopNativeTracking() {
+            if (nativeWatchId !== null) {
+                navigator.geolocation.clearWatch(nativeWatchId);
+                nativeWatchId = null;
+            }
+
+            isTracking = false;
+            isFollowing = false;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.remove('active');
+            baiduBtn.innerHTML = '📍 开始定位';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.remove('active');
+            followBtn.innerHTML = '🎯 自动跟随';
+            followBtn.disabled = true;
+
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.classList.remove('show');
+
+            var distanceText = totalDistance < 1000 
+                ? totalDistance.toFixed(1) + 'm' 
+                : (totalDistance / 1000).toFixed(2) + 'km';
+            console.log('⏹️ GPS定位已停止 - 总距离: ' + distanceText + ', 总点数: ' + pathPoints.length);
+        }
+
+        // 百度地图定位（备用方案）
+        var geolocation = new BMap.Geolocation();
+        var baiduLocationInterval = null;
+
+        function startBaiduTracking() {
+            isTracking = true;
+            isFollowing = true;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.add('active');
+            baiduBtn.innerHTML = '🔴 停止';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.add('active');
+            followBtn.innerHTML = '🎯 跟随中';
+            followBtn.disabled = false;
+
+            console.log('🗺️ 开始百度地图定位（备用方案）...');
+
+            function getBaiduLocation() {
+                geolocation.getCurrentPosition(function(r) {
+                    if (this.getStatus() == BMAP_STATUS_SUCCESS) {
+                        var lat = r.point.lat;
+                        var lng = r.point.lng;
+                        var accuracy = r.accuracy || 50;
+                        
+                        console.log('🗺️ 百度定位成功 - 纬度:', lat.toFixed(6), '经度:', lng.toFixed(6), '精度:', accuracy + 'm');
+                        
+                        // 百度定位返回的已经是BD09坐标，不需要转换
+                        processLocationUpdate(lat, lng, accuracy, 0, null, '百度定位');
+                    } else {
+                        console.error('❌ 百度定位失败:', this.getStatus());
+                    }
+                }, {enableHighAccuracy: true});
+            }
+
+            // 立即执行一次
+            getBaiduLocation();
+            
+            // 每2秒更新一次位置
+            baiduLocationInterval = setInterval(getBaiduLocation, 2000);
+        }
+
+        function stopBaiduTracking() {
+            if (baiduLocationInterval) {
+                clearInterval(baiduLocationInterval);
+                baiduLocationInterval = null;
+            }
+
+            isTracking = false;
+            isFollowing = false;
+            
+            var baiduBtn = document.getElementById('baiduLocationBtn');
+            baiduBtn.classList.remove('active');
+            baiduBtn.innerHTML = '📍 开始定位';
+
+            var followBtn = document.getElementById('followBtn');
+            followBtn.classList.remove('active');
+            followBtn.innerHTML = '🎯 自动跟随';
+            followBtn.disabled = true;
+
+            var infoPanel = document.getElementById('locationInfo');
+            infoPanel.classList.remove('show');
+
+            var distanceText = totalDistance < 1000 
+                ? totalDistance.toFixed(1) + 'm' 
+                : (totalDistance / 1000).toFixed(2) + 'km';
+            console.log('⏹️ 百度定位已停止 - 总距离: ' + distanceText + ', 总点数: ' + pathPoints.length);
+        }
+
+        // ========== 事件监听 ==========
+        document.getElementById('baiduLocationBtn').addEventListener('click', function() {
+            if (isTracking) {
+                // 停止所有定位
+                if (nativeWatchId !== null) {
+                    stopNativeTracking();
+                }
+                if (baiduLocationInterval !== null) {
+                    stopBaiduTracking();
+                }
+            } else {
+                // 优先使用原生GPS定位
+                startNativeTracking();
+            }
+        });
+
+        document.getElementById('followBtn').addEventListener('click', function() {
+            toggleFollow();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            clearMarkers();
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            var keyword = document.getElementById('searchInput').value.trim();
+            if (keyword) {
+                localSearch.search(keyword);
+            } else {
+                alert('请输入搜索关键词');
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('searchBtn').click();
+            }
+        });
+
+        // 点击地图隐藏搜索结果
+        map.addEventListener('click', function() {
+            document.getElementById('searchResults').style.display = 'none';
+        });
+
+        // 点击其他地方隐藏搜索结果
+        document.addEventListener('click', function(e) {
+            var resultsPanel = document.getElementById('searchResults');
+            var searchInput = document.getElementById('searchInput');
+            var searchBtn = document.getElementById('searchBtn');
+            if (e.target !== resultsPanel && e.target !== searchInput && e.target !== searchBtn) {
+                resultsPanel.style.display = 'none';
+            }
+        });
+
+        // 统计面板折叠功能
+        var statsCollapsed = false;
+        document.getElementById('statsHeader').addEventListener('click', function() {
+            statsCollapsed = !statsCollapsed;
+            var statsContent = document.getElementById('statsContent');
+            var statsToggle = document.getElementById('statsToggle');
+            
+            if (statsCollapsed) {
+                statsContent.classList.add('collapsed');
+                statsToggle.classList.add('collapsed');
+                statsToggle.textContent = '▶';
+            } else {
+                statsContent.classList.remove('collapsed');
+                statsToggle.classList.remove('collapsed');
+                statsToggle.textContent = '▼';
+            }
+        });
+
+        // 定位信息面板折叠功能
+        var infoCollapsed = false;
+        function setupInfoPanelToggle() {
+            var infoHeader = document.getElementById('infoHeader');
+            if (infoHeader) {
+                infoHeader.onclick = function() {
+                    infoCollapsed = !infoCollapsed;
+                    var infoContent = document.getElementById('infoContent');
+                    var infoToggle = document.getElementById('infoToggle');
+                    
+                    if (infoCollapsed) {
+                        infoContent.classList.add('collapsed');
+                        infoToggle.classList.add('collapsed');
+                        infoToggle.textContent = '▶';
+                    } else {
+                        infoContent.classList.remove('collapsed');
+                        infoToggle.classList.remove('collapsed');
+                        infoToggle.textContent = '▼';
+                    }
+                };
+            }
+        }
+
+        // 页面关闭时停止定位
+        window.addEventListener('beforeunload', function() {
+            if (nativeWatchId !== null) {
+                stopNativeTracking();
+            }
+            if (baiduLocationInterval) {
+                stopBaiduTracking();
+            }
+        });
+
+        console.log('✅ 地图导航系统初始化完成');
+    </script>
+</body>
+</html>
